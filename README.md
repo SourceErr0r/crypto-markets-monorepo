@@ -1,56 +1,51 @@
-# Welcome to your Expo app 👋
+# Crypto Markets
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo and React Native app that displays cryptocurrency market data from CoinGecko.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Build and run
 
 ```bash
-npm run reset-project
+corepack enable
+pnpm install
+pnpm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+With the Expo development server running, press `i` to open the iOS Simulator or `a` to open an Android emulator.
 
-### Other setup steps
+## Prerequisites and setup
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- A current Node.js LTS release.
+- pnpm, available through Corepack (included with current Node.js releases).
+- Xcode with an iOS Simulator, or Android Studio with an Android emulator.
+- A CoinGecko Demo API key.
 
-## Learn more
+Create a local environment file from the example:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+cp .env.example .env.local
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Then add your key to `.env.local`:
 
-## Join the community
+```env
+EXPO_PUBLIC_COINGECKO_API_KEY=your_coin_gecko_demo_key
+```
 
-Join our community of developers creating universal apps.
+Restart the Expo development server after changing environment configuration, then fully reload the app in the simulator.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### API key security
+
+The app calls CoinGecko directly and intentionally does not include a backend proxy. Expo exposes variables prefixed with `EXPO_PUBLIC_` to client code, so this API key is a public, revocable client credential rather than a server secret.
+
+Use a dedicated, low-privilege CoinGecko Demo key and keep it in `.env.local`, which is excluded from version control. A production application should move CoinGecko requests behind a server-side proxy, where the key can remain secret.
+
+## Useful commands
+
+```bash
+pnpm start       # Start Expo
+pnpm ios         # Start Expo and open iOS Simulator
+pnpm android     # Start Expo and open Android emulator
+pnpm web         # Start the web version
+pnpm lint        # Run linting
+npx tsc --noEmit # Type-check the project
+```
