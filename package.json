@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.21",
-    "dotenv": "^18.0.4",
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",
     "expo-device": "~57.0.2",
