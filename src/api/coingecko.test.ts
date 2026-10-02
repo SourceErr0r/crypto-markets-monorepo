@@ -6,6 +6,7 @@ import {
 import {
   getCryptocurrencyDetails,
   getCryptocurrencyPriceHistory,
+  searchCryptocurrencies,
   getTopCryptocurrencies,
 } from "@/api/coingecko";
 
@@ -252,5 +253,60 @@ describe("getTopCryptocurrencies", () => {
     await expect(
       getTopCryptocurrencies("usd", controller.signal),
     ).rejects.toBe(abortError);
+  });
+});
+
+describe("searchCryptocurrencies", () => {
+  it("does not call the API for a blank query", async () => {
+    await expect(searchCryptocurrencies("   ")).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("encodes the trimmed query and keeps only the fields the app uses", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        coins: [
+          {
+            id: "bitcoin",
+            name: "Bitcoin",
+            symbol: "BTC",
+            api_symbol: "bitcoin",
+            market_cap_rank: 1,
+            thumb: "thumb.png",
+          },
+          { id: "obscure", name: "Obscure", symbol: "OBS", market_cap_rank: null },
+        ],
+      }),
+    });
+
+    const results = await searchCryptocurrencies(" bit & coin ");
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(new URL(url).searchParams.get("query")).toBe("bit & coin");
+    expect(results).toEqual([
+      {
+        id: "bitcoin",
+        name: "Bitcoin",
+        symbol: "BTC",
+        market_cap_rank: 1,
+        thumb: "thumb.png",
+      },
+      {
+        id: "obscure",
+        name: "Obscure",
+        symbol: "OBS",
+        market_cap_rank: null,
+        thumb: "",
+      },
+    ]);
+  });
+
+  it("rejects responses without a coins list", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
+
+    await expect(searchCryptocurrencies("btc")).rejects.toMatchObject({
+      message: INVALID_RESPONSE_MESSAGE,
+    });
   });
 });

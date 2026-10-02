@@ -2,6 +2,7 @@ import { invalidResponseError } from "@/api/coingecko-errors";
 import type {
   Cryptocurrency,
   CryptocurrencyDetails,
+  CryptocurrencySearchResult,
   PriceHistoryPoint,
 } from "@/api/coingecko.types";
 
@@ -134,4 +135,27 @@ export function parsePriceHistory(value: unknown): PriceHistoryPoint[] {
   return Array.from(new Map(prices as PriceHistoryPoint[])).sort(
     (a, b) => a[0] - b[0],
   );
+}
+
+export function parseSearchResults(value: unknown): CryptocurrencySearchResult[] {
+  const { coins } = record(value);
+  if (!Array.isArray(coins)) throw invalidResponseError();
+
+  return coins.map((item) => {
+    const coin = record(item);
+    if (
+      typeof coin.id !== "string" ||
+      typeof coin.name !== "string" ||
+      typeof coin.symbol !== "string"
+    ) {
+      throw invalidResponseError();
+    }
+    return {
+      id: coin.id,
+      name: coin.name,
+      symbol: coin.symbol,
+      market_cap_rank: number(coin.market_cap_rank),
+      thumb: typeof coin.thumb === "string" ? coin.thumb : "",
+    };
+  });
 }

@@ -15,6 +15,7 @@ import {
 
 import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
+import { SearchButton } from "@/components/search-button";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
 import { useCryptocurrencies } from "@/hooks/use-cryptocurrencies";
@@ -32,6 +33,10 @@ export default function DashboardScreen() {
       pathname: "/coin/[id]",
       params: { id, currency, name: coin?.name ?? id },
     });
+  };
+
+  const handleSearchPress = () => {
+    router.push({ pathname: "/search", params: { currency } });
   };
 
   const emptyState = isLoading ? (
@@ -71,7 +76,10 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.eyebrow}>CRYPTOCURRENCY</Text>
-          <CurrencyMenu currency={currency} onSelect={setCurrency} />
+          <View style={styles.headerActions}>
+            <SearchButton onPress={handleSearchPress} />
+            <CurrencyMenu currency={currency} onSelect={setCurrency} />
+          </View>
         </View>
         <Text style={styles.title}>Market overview</Text>
         <Text style={styles.subtitle}>
@@ -130,6 +138,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   eyebrow: {
     color: theme.colors.accent,

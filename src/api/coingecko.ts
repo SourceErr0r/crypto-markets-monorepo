@@ -8,6 +8,7 @@ import {
   parseCryptocurrencies,
   parseCryptocurrencyDetails,
   parsePriceHistory,
+  parseSearchResults,
 } from "@/api/coingecko-parsers";
 import type {
   CoinGeckoErrorResponse,
@@ -107,6 +108,7 @@ export async function getCryptocurrencyPriceHistory(
 
 export async function searchCryptocurrencies(
   query: string,
+  signal?: AbortSignal,
 ): Promise<CryptocurrencySearchResult[]> {
   const trimmedQuery = query.trim();
 
@@ -114,9 +116,7 @@ export async function searchCryptocurrencies(
     return [];
   }
 
-  const response = await request<{ coins: CryptocurrencySearchResult[] }>(
-    `/search?query=${encodeURIComponent(trimmedQuery)}`,
-  );
-
-  return response.coins;
+  const params = new URLSearchParams({ query: trimmedQuery });
+  const response = await request<unknown>(`/search?${params.toString()}`, signal);
+  return parseSearchResults(response);
 }
