@@ -4,6 +4,7 @@ import type {
   CryptocurrencyDetails,
   CryptocurrencySearchResult,
 } from "@/api/coingecko.types";
+import type { CurrencyCode } from "@/constants/currencies";
 
 export type {
   Cryptocurrency,
@@ -33,13 +34,14 @@ async function request<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function getTopCryptocurrencies(): Promise<Cryptocurrency[]> {
+export function getTopCryptocurrencies(
+  currency: CurrencyCode,
+): Promise<Cryptocurrency[]> {
   const params = new URLSearchParams({
-    vs_currency: "usd",
+    vs_currency: currency,
     order: "market_cap_desc",
     per_page: "10",
     page: "1",
-    sparkline: "false",
   });
 
   return request<Cryptocurrency[]>(`/coins/markets?${params.toString()}`);
