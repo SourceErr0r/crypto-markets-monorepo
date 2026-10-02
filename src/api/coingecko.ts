@@ -1,8 +1,21 @@
+import {
+  CoinGeckoError,
+  httpErrorMessage,
+  INVALID_RESPONSE_MESSAGE,
+  NETWORK_ERROR_MESSAGE,
+} from "@/api/coingecko-errors";
+import {
+  parseCryptocurrencies,
+  parseCryptocurrencyDetails,
+  parsePriceHistory,
+} from "@/api/coingecko-parsers";
 import type {
   CoinGeckoErrorResponse,
   Cryptocurrency,
   CryptocurrencyDetails,
   CryptocurrencySearchResult,
+  HistoryDays,
+  PriceHistoryPoint,
 } from "@/api/coingecko.types";
 import type { CurrencyCode } from "@/constants/currencies";
 
@@ -15,27 +28,40 @@ export type {
 const API_KEY = process.env.EXPO_PUBLIC_COINGECKO_API_KEY;
 const baseUrl = "https://api.coingecko.com/api/v3";
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    headers: API_KEY ? { "x-cg-demo-api-key": API_KEY } : undefined,
-  });
-
-  if (!response.ok) {
-    const errorResponse = (await response
-      .json()
-      .catch(() => null)) as CoinGeckoErrorResponse | null;
-    throw new Error(
-      errorResponse?.status?.error_message ??
-        errorResponse?.error ??
-        "CoinGecko request failed.",
-    );
+async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      headers: API_KEY ? { "x-cg-demo-api-key": API_KEY } : undefined,
+      signal,
+    });
+  } catch (error) {
+    // Cancelled requests are not failures. Anything else means no response.
+    if (signal?.aborted) throw error;
+    throw new CoinGeckoError(NETWORK_ERROR_MESSAGE, { cause: error });
   }
 
-  return (await response.json()) as T;
+  if (!response.ok) {
+    const body = (await response
+      .json()
+      .catch(() => null)) as CoinGeckoErrorResponse | null;
+    const code = body?.status?.error_code;
+    throw new CoinGeckoError(httpErrorMessage(response.status, code), {
+      status: response.status,
+      code,
+    });
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    throw new CoinGeckoError(INVALID_RESPONSE_MESSAGE, { cause: error });
+  }
 }
 
-export function getTopCryptocurrencies(
+export async function getTopCryptocurrencies(
   currency: CurrencyCode,
+  signal?: AbortSignal,
 ): Promise<Cryptocurrency[]> {
   const params = new URLSearchParams({
     vs_currency: currency,
@@ -44,15 +70,39 @@ export function getTopCryptocurrencies(
     page: "1",
   });
 
-  return request<Cryptocurrency[]>(`/coins/markets?${params.toString()}`);
+  const response = await request<unknown>(
+    `/coins/markets?${params.toString()}`,
+    signal,
+  );
+  return parseCryptocurrencies(response);
 }
 
-export function getCryptocurrencyDetails(
+export async function getCryptocurrencyDetails(
   coinId: string,
+  signal?: AbortSignal,
 ): Promise<CryptocurrencyDetails> {
-  return request<CryptocurrencyDetails>(
+  const response = await request<unknown>(
     `/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&community_data=false&developer_data=false`,
+    signal,
   );
+  return parseCryptocurrencyDetails(response);
+}
+
+export async function getCryptocurrencyPriceHistory(
+  coinId: string,
+  currency: CurrencyCode,
+  days: HistoryDays,
+  signal?: AbortSignal,
+): Promise<PriceHistoryPoint[]> {
+  const params = new URLSearchParams({
+    vs_currency: currency,
+    days: String(days),
+  });
+  const response = await request<unknown>(
+    `/coins/${encodeURIComponent(coinId)}/market_chart?${params.toString()}`,
+    signal,
+  );
+  return parsePriceHistory(response);
 }
 
 export async function searchCryptocurrencies(

@@ -17,13 +17,23 @@ export function CryptocurrencyRow({
   onRowPress,
 }: CryptocurrencyRowProps) {
   return (
-    <TouchableOpacity style={styles.row} onPress={() => onRowPress(item.id)}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`View ${item.name} details`}
+      style={styles.row}
+      onPress={() => onRowPress(item.id)}
+    >
       <Text style={styles.rank}>{item.market_cap_rank ?? "—"}</Text>
-      <Image
-        accessibilityLabel={`${item.name} logo`}
-        source={{ uri: item.image }}
-        style={styles.coinImage}
-      />
+      {item.image ? (
+        <Image
+          accessibilityLabel={`${item.name} logo`}
+          source={{ uri: item.image }}
+          style={styles.coinImage}
+        />
+      ) : (
+        // Keep the row aligned when a coin has no logo.
+        <View style={styles.coinImage} />
+      )}
       <View style={styles.coinDetails}>
         <Text numberOfLines={1} style={styles.coinName}>
           {item.name}

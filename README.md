@@ -39,6 +39,10 @@ The app calls CoinGecko directly and intentionally does not include a backend pr
 
 Use a dedicated, low-privilege CoinGecko Demo key and keep it in `.env.local`, which is excluded from version control. A production application should move CoinGecko requests behind a server-side proxy, where the key can remain secret.
 
+## Data fetching and caching
+
+Server data is fetched with [TanStack Query](https://tanstack.com/query). It caches responses per query key for five minutes, de-duplicates in-flight requests, cancels abandoned ones and handles retries. This keeps range switching on the price chart instant and reduces pressure on CoinGecko's rate limits, without hand-written cache code. Response validation lives in `src/api/coingecko-parsers.ts`.
+
 ## Useful commands
 
 ```bash

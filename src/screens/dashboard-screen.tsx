@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -24,7 +25,14 @@ export default function DashboardScreen() {
   const { cryptocurrencies, error, isLoading, isRefreshing, refresh } =
     useCryptocurrencies(currency);
 
-  const handleCryptocurrencyPress = (id: string) => {};
+  const handleCryptocurrencyPress = (id: string) => {
+    const coin = cryptocurrencies.find((item) => item.id === id);
+
+    router.push({
+      pathname: "/coin/[id]",
+      params: { id, currency, name: coin?.name ?? id },
+    });
+  };
 
   const emptyState = isLoading ? (
     <View style={styles.emptyState}>
@@ -37,7 +45,7 @@ export default function DashboardScreen() {
   ) : error ? (
     <View style={styles.emptyState}>
       <Text style={styles.emptyTitle}>Failed to load</Text>
-      <Text style={styles.emptyMessage}>{error.message}</Text>
+      <Text style={styles.emptyMessage}>{error}</Text>
       <Pressable
         accessibilityRole="button"
         onPress={refresh}
