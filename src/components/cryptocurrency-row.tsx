@@ -1,11 +1,4 @@
-import {
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type ListRenderItemInfo,
-} from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import type { Cryptocurrency } from "@/api/coingecko";
 import type { CurrencyCode } from "@/constants/currencies";
@@ -18,20 +11,13 @@ type CryptocurrencyRowProps = {
   onRowPress: (id: string) => void;
 };
 
-type CryptoCyrrencyRendererProps = {
-  currency: CurrencyCode;
-  handleCryptocurrencyPress: (id: string) => void;
-};
-
 export function CryptocurrencyRow({
   item,
   currency,
   onRowPress,
 }: CryptocurrencyRowProps) {
-  const handleOnPress = () => onRowPress(item.id);
-
   return (
-    <TouchableOpacity style={styles.row} onPress={handleOnPress}>
+    <TouchableOpacity style={styles.row} onPress={() => onRowPress(item.id)}>
       <Text style={styles.rank}>{item.market_cap_rank ?? "—"}</Text>
       <Image
         accessibilityLabel={`${item.name} logo`}
@@ -54,23 +40,6 @@ export function CryptocurrencyRow({
       </View>
     </TouchableOpacity>
   );
-}
-
-export function createCryptocurrencyRenderer({
-  currency,
-  handleCryptocurrencyPress,
-}: CryptoCyrrencyRendererProps) {
-  return function renderCryptocurrency({
-    item,
-  }: ListRenderItemInfo<Cryptocurrency>) {
-    return (
-      <CryptocurrencyRow
-        item={item}
-        currency={currency}
-        onRowPress={handleCryptocurrencyPress}
-      />
-    );
-  };
 }
 
 const styles = StyleSheet.create({

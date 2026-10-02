@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { createCryptocurrencyRenderer } from "@/components/cryptocurrency-row";
+import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
@@ -21,10 +21,6 @@ import { useCryptocurrencies } from "@/hooks/use-cryptocurrencies";
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [currency, setCurrency] = useState<CurrencyCode>("gbp");
-  const renderCryptocurrency = useMemo(
-    () => createCryptocurrencyRenderer({ currency, handleCryptocurrencyPress }),
-    [currency],
-  );
   const { cryptocurrencies, error, isLoading, isRefreshing, refresh } =
     useCryptocurrencies(currency);
 
@@ -87,7 +83,13 @@ export default function DashboardScreen() {
         ListEmptyComponent={emptyState}
         onRefresh={refresh}
         refreshing={isRefreshing}
-        renderItem={renderCryptocurrency}
+        renderItem={({ item }) => (
+          <CryptocurrencyRow
+            currency={currency}
+            item={item}
+            onRowPress={handleCryptocurrencyPress}
+          />
+        )}
         showsVerticalScrollIndicator={false}
         style={styles.list}
       />
