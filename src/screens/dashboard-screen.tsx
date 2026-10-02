@@ -1,13 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -16,6 +9,7 @@ import {
 import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
 import { SearchButton } from "@/components/search-button";
+import { StateMessage } from "@/components/state-message";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
 import { useCryptocurrencies } from "@/hooks/use-cryptocurrencies";
@@ -40,35 +34,18 @@ export default function DashboardScreen() {
   };
 
   const emptyState = isLoading ? (
-    <View style={styles.emptyState}>
-      <ActivityIndicator color={theme.colors.accent} size="large" />
-      <Text style={styles.emptyTitle}>Loading market data</Text>
-      <Text style={styles.emptyMessage}>
-        Fetching the top cryptocurrencies.
-      </Text>
-    </View>
+    <StateMessage
+      loading
+      title="Loading market data"
+      message="Fetching the top cryptocurrencies."
+    />
   ) : error ? (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>Failed to load</Text>
-      <Text style={styles.emptyMessage}>{error}</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={refresh}
-        style={({ pressed }) => [
-          styles.retryButton,
-          pressed && styles.buttonPressed,
-        ]}
-      >
-        <Text style={styles.retryButtonText}>Try again</Text>
-      </Pressable>
-    </View>
+    <StateMessage title="Failed to load" message={error} onRetry={refresh} />
   ) : (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No cryptocurrencies found</Text>
-      <Text style={styles.emptyMessage}>
-        Pull down to refresh the market data.
-      </Text>
-    </View>
+    <StateMessage
+      title="No cryptocurrencies found"
+      message="Pull down to refresh the market data."
+    />
   );
 
   return (
@@ -94,7 +71,6 @@ export default function DashboardScreen() {
           cryptocurrencies.length === 0 && styles.emptyListContent,
         ]}
         data={cryptocurrencies}
-        initialNumToRender={10}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={emptyState}
         onRefresh={refresh}
@@ -167,40 +143,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1.2,
     marginTop: 24,
-  },
-  emptyState: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  emptyMessage: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  retryButton: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    marginTop: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  buttonPressed: {
-    backgroundColor: theme.colors.accentPressed,
   },
 });

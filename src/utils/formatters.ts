@@ -14,7 +14,18 @@ function defaultFractionDigits(value: number) {
   const abs = Math.abs(value);
   if (abs >= 1) return 2;
   if (abs === 0) return 4;
-  return Math.min(12, Math.max(4, Math.ceil(-Math.log10(abs)) + 2));
+  return Math.min(20, Math.max(4, Math.ceil(-Math.log10(abs)) + 2));
+}
+
+const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
+
+// Collapse long runs of leading decimal zeros: 0.00000000098 becomes 0.0₉98.
+export function compactZeros(formatted: string) {
+  return formatted.replace(
+    /\.(0{4,})(\d+)/,
+    (_, zeros: string, rest: string) =>
+      `.0${[...String(zeros.length)].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join("")}${rest}`,
+  );
 }
 
 export function formatNumber(
@@ -38,10 +49,12 @@ export function formatPrice(price: number | null, currency: CurrencyCode) {
     return "—";
   }
 
-  return formatNumber(price, {
-    style: "currency",
-    currency: currencies[currency].code,
-  });
+  return compactZeros(
+    formatNumber(price, {
+      style: "currency",
+      currency: currencies[currency].code,
+    }),
+  );
 }
 
 export function formatMarketCap(

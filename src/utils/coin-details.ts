@@ -3,18 +3,33 @@ import { LOCALE } from "@/constants/locale";
 
 import { formatNumber } from "@/utils/formatters";
 
+const UNITS = [
+  { threshold: 1e15, suffix: "Q" },
+  { threshold: 1e12, suffix: "T" },
+  { threshold: 1e9, suffix: "B" },
+  { threshold: 1e6, suffix: "M" },
+];
+
+// Scaled explicitly because some mobile runtimes ignore Intl's compact notation.
 export function formatAmount(
   value: number | null | undefined,
   currency?: CurrencyCode,
 ) {
   if (value == null || !Number.isFinite(value)) return "—";
-  return formatNumber(value, {
+  const unit = UNITS.find(({ threshold }) => value >= threshold);
+  const formatted = formatNumber(value / (unit?.threshold ?? 1), {
+    maximumFractionDigits: 2,
     ...(currency
       ? { style: "currency", currency: currencies[currency].code }
       : {}),
-    notation: value >= 1_000_000 ? "compact" : "standard",
-    maximumFractionDigits: 2,
   });
+  return `${formatted}${unit?.suffix ?? ""}`;
+}
+
+// CoinGecko sometimes reports 0 for a 24h high/low on micro-priced coins. A
+// real price is never zero, so treat it as missing data.
+export function positiveOrNull(value: number | null | undefined) {
+  return value != null && value > 0 ? value : null;
 }
 
 export function formatDate(value: string | null | undefined) {

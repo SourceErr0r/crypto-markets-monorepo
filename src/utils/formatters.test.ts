@@ -55,8 +55,15 @@ describe('formatted number decimal policy', () => {
   });
 
   it('keeps micro prices from rounding to zero', () => {
-    expect(formatPrice(0.000006, 'gbp')).toBe('£0.000006');
-    expect(formatPrice(0.00001234, 'usd')).toBe('US$0.0000123');
+    expect(formatPrice(0.0006, 'gbp')).toBe('£0.0006');
+    expect(formatPrice(0.00123, 'usd')).toBe('US$0.00123');
+  });
+
+  it('collapses long runs of leading zeros into a subscript count', () => {
+    expect(formatPrice(0.000006, 'gbp')).toBe('£0.0₅6');
+    expect(formatPrice(0.00001234, 'usd')).toBe('US$0.0₄123');
+    expect(formatPrice(1.30508e-10, 'gbp')).toBe('£0.0₉131');
+    expect(formatPrice(7.7429e-11, 'gbp')).toBe('£0.0₁₀774');
   });
 
   it('preserves extra precision below one', () => {

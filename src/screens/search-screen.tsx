@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -14,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { CryptocurrencySearchResult } from "@/api/coingecko";
 import { SearchResultRow } from "@/components/search-result-row";
+import { StateMessage } from "@/components/state-message";
 import { currencyCodes } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
 import { useCryptocurrencySearch } from "@/hooks/use-cryptocurrency-search";
@@ -33,38 +33,19 @@ export default function SearchScreen() {
   };
 
   const emptyState = isLoading ? (
-    <View style={styles.emptyState}>
-      <ActivityIndicator color={theme.colors.accent} size="large" />
-    </View>
+    <StateMessage loading />
   ) : error ? (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>Search failed</Text>
-      <Text style={styles.emptyMessage}>{error}</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={retry}
-        style={({ pressed }) => [
-          styles.retryButton,
-          pressed && styles.retryButtonPressed,
-        ]}
-      >
-        <Text style={styles.retryButtonText}>Try again</Text>
-      </Pressable>
-    </View>
+    <StateMessage title="Search failed" message={error} onRetry={retry} />
   ) : hasTerm ? (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No results</Text>
-      <Text style={styles.emptyMessage}>
-        Nothing matched “{query.trim()}”. Try a different name or symbol.
-      </Text>
-    </View>
+    <StateMessage
+      title="No results"
+      message={`Nothing matched “${query.trim()}”. Try a different name or symbol.`}
+    />
   ) : (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>Search cryptocurrencies</Text>
-      <Text style={styles.emptyMessage}>
-        Enter a name or symbol, such as Bitcoin or ETH.
-      </Text>
-    </View>
+    <StateMessage
+      title="Search cryptocurrencies"
+      message="Enter a name or symbol, such as Bitcoin or ETH."
+    />
   );
 
   return (
@@ -155,40 +136,5 @@ const styles = StyleSheet.create({
   },
   emptyListContent: {
     flexGrow: 1,
-  },
-  emptyState: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    paddingBottom: 80,
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  emptyMessage: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  retryButton: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    marginTop: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  retryButtonPressed: {
-    backgroundColor: theme.colors.accentPressed,
-  },
-  retryButtonText: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: "700",
   },
 });

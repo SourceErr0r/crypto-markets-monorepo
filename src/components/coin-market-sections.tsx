@@ -10,6 +10,7 @@ import type { CurrencyCode } from "@/constants/currencies";
 import {
   formatAmount,
   formatDate,
+  positiveOrNull,
   rangePercentage,
 } from "@/utils/coin-details";
 import { formatDecimal, formatPrice } from "@/utils/formatters";
@@ -41,8 +42,8 @@ export function MarketOverview({ coin, currency }: SectionProps) {
 export function DayRange({ coin, currency }: SectionProps) {
   const market = coin.market_data;
   const price = market.current_price[currency] ?? null;
-  const low = market.low_24h[currency] ?? null;
-  const high = market.high_24h[currency] ?? null;
+  const low = positiveOrNull(market.low_24h[currency]);
+  const high = positiveOrNull(market.high_24h[currency]);
   const position = rangePercentage(price, low, high);
 
   return (

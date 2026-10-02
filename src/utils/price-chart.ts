@@ -2,7 +2,7 @@ import type { HistoryDays, PriceHistoryPoint } from "@/api/coingecko.types";
 import { currencies, type CurrencyCode } from "@/constants/currencies";
 import { LOCALE } from "@/constants/locale";
 
-import { formatNumber } from "@/utils/formatters";
+import { compactZeros, formatNumber } from "@/utils/formatters";
 
 export function priceDomain(points: PriceHistoryPoint[]) {
   const prices = points.map((point) => point[1]);
@@ -43,17 +43,6 @@ function formatCurrency(
     currency: currencies[currency].code,
     maximumFractionDigits,
   });
-}
-
-const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
-
-// Collapse long runs of leading decimal zeros: 0.00000000098 becomes 0.0₉98.
-function compactZeros(formatted: string) {
-  return formatted.replace(
-    /\.(0{4,})(\d+)/,
-    (_, zeros: string, rest: string) =>
-      `.0${[...String(zeros.length)].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join("")}${rest}`,
-  );
 }
 
 function formatAxisPrice(
