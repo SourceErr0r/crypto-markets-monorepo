@@ -1,157 +1,80 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+# AGENTS.md
 
-## Expo has changed — do not trust your training data
+Expo / React Native app showing CoinGecko market data. Mobile-first, also runs on web.
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+## Working rules
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+- **Plan first.** Before changing any code or files, state what you will change, which files, and any assumptions or open questions. Wait for an explicit yes. If the plan changes mid-task, stop and re-confirm.
+- **Scope.** If a request falls outside the current task, say so and recommend a fresh session instead of continuing.
+
+## Stack
+
+- Expo SDK 57, React Native 0.86 (New Architecture), React 19, TypeScript
+- Expo Router (file-based routes), TanStack Query for server state
+- Jest + jest-expo + React Native Testing Library
+- pnpm (`pnpm-lock.yaml`)
+- CoinGecko API, key from `.env.local` (see `.env.example`)
+
+## Expo has changed: do not trust your training data
+
+Expo ships breaking changes every SDK release. Before writing code that touches an Expo, EAS or React Native API, check the versioned docs at https://docs.expo.dev/versions/v57.0.0/ or the index at https://docs.expo.dev/llms.txt (it lists common LLM misconceptions). Never answer from memory.
 
 ## Commands
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
-
 ```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
+npx expo install <package>  # ALWAYS use instead of pnpm add; resolves SDK-compatible versions
+pnpm start                  # dev server
+pnpm lint                   # expo lint
 npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
+pnpm test                   # jest
+npx expo-doctor             # diagnose dependency/config issues
 ```
 
-Run lint and typecheck before declaring any task done.
+Run lint and typecheck before declaring a task done.
 
-## Navigation & Routing
+## Structure
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
-
-## Project
-
-This is a small React Native application built with Expo and TypeScript.
-
-The application displays cryptocurrency market data from the CoinGecko API.
-
-This project started as a small technical assessment and is being expanded into a portfolio piece. Code should prioritise clarity, maintainability, and straightforward design choices over unnecessary abstraction.
-
-## Efficiency
-
-Use the cheapest validation that provides reasonable confidence.
-
-Do not run expensive validation merely for completeness.
-
-For routine TypeScript / React changes, do not run:
-
-- Gradle builds
-- Xcode builds
-- CocoaPods installs
-- app install / launch tasks
-- Maestro or Playwright suites
-- full-project test suites
-
-Prefer targeted checks against the files or behaviour changed.
-
-Do not escalate to native builds unless one of the conditions in the Native validation section applies.
-
-## Development principles
-
-- Use TypeScript.
-- Prefer simple, readable implementations.
-- Avoid unnecessary abstractions or premature optimisation.
-- Prefer React Native and Expo APIs over additional dependencies where reasonable.
-- Do not add dependencies unless they provide clear value.
-- Follow existing project patterns before introducing new ones.
-- Keep components small and focused.
-- Extract reusable behaviour when there is genuine reuse.
-- Avoid `any`.
-- Avoid clever code that is difficult to explain.
-
-## React Native
-
-- Use functional React components and hooks.
-- Consider mobile usability and different screen sizes.
-- Avoid fixed dimensions where responsive layout is appropriate.
-- Avoid deprecated React Native APIs.
-- Use `FlatList` for lists of cryptocurrency data.
-- Ensure loading, empty, and error states are handled.
-- Consider accessibility for interactive elements.
-
-## API integration
-
-- CoinGecko is the external data source.
-- Keep API calls separate from UI components.
-- Define TypeScript types for API responses that the application actually consumes.
-- Handle network failures and unexpected responses.
-- Do not commit API credentials.
-- Avoid silently swallowing API errors.
-
-Relevant API endpoints include:
-
-- `/coins/markets`
-- `/coins/{id}`
-- CoinGecko search endpoints where appropriate
-
-## Project structure
-
-Prefer a simple feature-oriented structure.
-
-For example:
-
+```
 src/
-api/
-components/
-features/
-hooks/
-navigation/
-screens/
-types/
+  app/         Expo Router routes only (_layout.tsx = navigators). No other code here.
+  screens/     Screen components rendered by routes
+  components/  Small presentational components
+  hooks/       TanStack Query hooks (one per data need)
+  api/         CoinGecko client, response types, parsers, errors
+  utils/       Pure helpers (formatting, chart data)
+  constants/   Theme, currencies, locale
+  test/        Shared test helpers
+docs/DECISIONS.md  Recorded design decisions
+```
 
-Do not create layers or directories that are not justified by the size of the application.
+## Conventions
 
-## Testing
+- Simple, readable code over clever code or speculative abstraction. Follow existing patterns before adding new ones. Extract only on genuine reuse.
+- Functional components and hooks. Keep components small and focused.
+- Use `FlatList` for coin lists. Handle loading, empty and error states.
+- Responsive layout over fixed dimensions. Add accessibility props on interactive elements.
+- Keep API calls out of UI components: `api/` → `hooks/` → `screens/`.
+- Type only the API fields the app consumes. Handle network failures and unexpected response shapes.
+- Prefer Expo/RN APIs over new dependencies.
+- Test behaviour and logic with meaningful edge cases, not implementation details. Put tests next to the file (`*.test.ts[x]`).
+- Make the smallest reasonable change and reuse existing components and utilities.
 
-- Prefer testing important application behaviour over implementation details.
-- Add tests for logic with meaningful edge cases.
-- Do not create tests solely to increase test count.
+## Don't
 
-## Changes
+- Don't create or edit `ios/` or `android/` by hand. They are generated (CNG); configure via `app.json` and config plugins.
+- Don't commit secrets, `.env*.local` or `.dev.vars`.
+- Don't use `any`.
+- Don't silently swallow API errors.
+- Don't add dependencies without clear value.
+- Don't use paid EAS builds. Prefer local or GitHub Actions builds.
+- Don't make unrelated refactors.
+- Don't run expensive validation for routine TS/React changes: no Gradle/Xcode builds, pod installs, app install/launch, Maestro/Playwright, or the full test suite. Run targeted tests for what changed. A native build is only justified when native code or config changes.
+- Expo Go only bundles its own native modules. Adding a native library needs a development build (`npx expo run:ios|android`).
 
-Before implementing a task:
+## Product requirements
 
-1. Inspect the existing implementation.
-2. Identify the smallest reasonable change.
-3. Reuse existing components and utilities where appropriate.
-4. Avoid unrelated refactors.
-5. Run TypeScript/lint/tests after significant changes.
+Top 10 coins by market cap. Open a coin for details. Search by name or symbol. Handle loading and API errors. Work well on mobile screen sizes. Talk to CoinGecko directly (a proxy is planned). Easy for another developer to run locally.
 
-When completing a task:
+## When done
 
-- Briefly explain what was changed.
-- Mention any important design decision or trade-off.
-- Mention anything that should be manually tested.
-
-## Core requirements
-
-The application must:
-
-- Display the top 10 cryptocurrencies by market cap.
-- Allow a cryptocurrency to be opened for detailed information.
-- Support searching by cryptocurrency name or symbol.
-- Handle loading and API error states.
-- Work well on mobile screen sizes.
-- Integrate directly with CoinGecko.
-- Be straightforward for another developer to run locally.
+Briefly explain what changed, any important design decision or trade-off, and what should be tested manually.
