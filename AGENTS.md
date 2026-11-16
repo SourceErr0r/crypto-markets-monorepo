@@ -44,7 +44,7 @@ src/
   utils/       Pure helpers (formatting, chart data)
   constants/   Theme, currencies, locale
   test/        Shared test helpers
-docs/DECISIONS.md  Recorded design decisions
+docs/          Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
 ```
 
 ## Conventions

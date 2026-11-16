@@ -4,6 +4,8 @@ An Expo and React Native app that displays cryptocurrency market data from CoinG
 
 This project started as a small technical assessment, which I've since chosen to expand into a fuller product covering the API layer, security, CI/CD, and mobile plus web. The original submission is tagged `take-home-submission`.
 
+Design decisions and an audit of the API layer, with the plan for what comes next, are in [docs/](docs/).
+
 ## Prerequisites
 
 - A current Node.js LTS release.
