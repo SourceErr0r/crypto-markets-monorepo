@@ -137,7 +137,9 @@ export function parsePriceHistory(value: unknown): PriceHistoryPoint[] {
   );
 }
 
-export function parseSearchResults(value: unknown): CryptocurrencySearchResult[] {
+export function parseSearchResults(
+  value: unknown,
+): CryptocurrencySearchResult[] {
   const { coins } = record(value);
   if (!Array.isArray(coins)) throw invalidResponseError();
 
