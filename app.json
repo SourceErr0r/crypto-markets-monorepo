@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "CryptoMarkets",
-    "slug": "CryptoMarkets",
+    "name": "Crypto Markets",
+    "slug": "crypto-markets-expo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "crypto-markets-expo",
+    "scheme": "cryptomarkets",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080B14",
     "android": {

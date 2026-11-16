@@ -2,7 +2,7 @@
 
 An Expo and React Native app that displays cryptocurrency market data from CoinGecko: the top 10 coins by market cap, searchable by name or symbol, with a detail view and price history chart for each coin.
 
-Design decisions and trade-offs are in [docs/DECISIONS.md](docs/DECISIONS.md).
+This project started as a small technical assessment, which I've since chosen to expand into a fuller product covering the API layer, security, CI/CD, and mobile plus web. The original submission is tagged `take-home-submission`.
 
 ## Prerequisites
 

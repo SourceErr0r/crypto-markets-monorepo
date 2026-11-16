@@ -46,7 +46,7 @@ This is a small React Native application built with Expo and TypeScript.
 
 The application displays cryptocurrency market data from the CoinGecko API.
 
-This repository is being produced as part of a technical assessment. Code should therefore prioritise clarity, maintainability, and straightforward design choices over unnecessary abstraction.
+This project started as a small technical assessment and is being expanded into a portfolio piece. Code should prioritise clarity, maintainability, and straightforward design choices over unnecessary abstraction.
 
 ## Efficiency
 
@@ -144,7 +144,7 @@ When completing a task:
 - Mention any important design decision or trade-off.
 - Mention anything that should be manually tested.
 
-## Assessment constraints
+## Core requirements
 
 The application must:
 
