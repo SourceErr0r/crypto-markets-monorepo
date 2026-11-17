@@ -1,0 +1,23 @@
+// Cloudflare Worker that sits between the apps and CoinGecko.
+// https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "crypto-markets-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+
+  // Response cache (see src/cache.ts). No id: Wrangler creates the namespace
+  // on first deploy, and `wrangler dev` uses a local simulation.
+  "kv_namespaces": [{ "binding": "CACHE" }],
+
+  // Per-IP limit (see src/index.ts). Counts are per Cloudflare location and
+  // approximate. Period must be 10 or 60 seconds.
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ]
+}

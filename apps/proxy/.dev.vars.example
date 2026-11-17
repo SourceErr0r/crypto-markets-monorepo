@@ -1,0 +1,6 @@
+# Copy to .dev.vars (gitignored) for `pnpm proxy`.
+# Optional: without a key the proxy uses CoinGecko's keyless public tier,
+# which has a lower, shared rate limit. Get a free Demo key at
+# https://www.coingecko.com/en/api/pricing
+# Deployed Workers read it from a secret instead: `wrangler secret put COINGECKO_API_KEY`.
+COINGECKO_API_KEY=
