@@ -1,5 +1,7 @@
 # Crypto Markets
 
+[![CI](https://github.com/SourceErr0r/crypto-markets-monorepo/actions/workflows/ci.yml/badge.svg)](https://github.com/SourceErr0r/crypto-markets-monorepo/actions/workflows/ci.yml)
+
 An Expo and React Native app that displays cryptocurrency market data from CoinGecko: the top 10 coins by market cap, searchable by name or symbol, with a detail view and price history chart for each coin.
 
 This project started as a small technical assessment, which I've since chosen to expand into a fuller product covering the API layer, security, CI/CD, and mobile plus web. The original submission is tagged `take-home-submission`.
@@ -86,6 +88,6 @@ pnpm lint         # Lint every workspace package
 pnpm typecheck    # Type-check every workspace package
 ```
 
-All commands run from the repository root. To add a dependency to the app, run `npx expo install <package>` inside `apps/mobile`.
+All commands run from the repository root. CI runs `pnpm lint`, `pnpm typecheck` and `pnpm test` on every pull request and push to `main` (see `.github/workflows/ci.yml`). To add a dependency to the app, run `npx expo install <package>` inside `apps/mobile`.
 
 Tests cover the API layer, hooks and formatting utilities. There are no UI tests.

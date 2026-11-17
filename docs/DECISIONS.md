@@ -62,6 +62,12 @@ Plain pnpm workspaces were chosen over Turborepo or Nx. With two or three packag
 
 Expo configures Metro for monorepos automatically, so there is no custom `metro.config.js`. pnpm's default isolated install is kept rather than `nodeLinker: hoisted`, which keeps each package's dependencies explicit. Hoisting is the fallback if a native library fails to resolve.
 
+### Continuous integration
+
+A single GitHub Actions workflow runs on every pull request and on pushes to `main`. It installs with a frozen lockfile, then runs `pnpm lint`, `pnpm typecheck` and `pnpm test` across every workspace package: the same commands used locally. Node is pinned in `.nvmrc` and pnpm in the root `package.json` `packageManager` field, so local and CI toolchains match.
+
+It is one job rather than one per check. Installing dependencies is most of the run time, so parallel jobs would mostly repeat it. Every package is checked on every run; running only the packages affected by a change (`pnpm --filter "...[origin/main]"` or a task runner) would be worth it once there are several apps and CI time grows. Actions are pinned to major version tags; pinning to commit SHAs with Dependabot updates is the stricter option. No secrets are needed, since the CoinGecko key is optional.
+
 ## Known gaps and what I'd do next
 
 - Component/screen tests with React Native Testing Library.

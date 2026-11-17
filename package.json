@@ -1,6 +1,7 @@
 {
   "name": "crypto-markets-monorepo",
   "private": true,
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "start": "pnpm --filter mobile start",
     "ios": "pnpm --filter mobile ios",
