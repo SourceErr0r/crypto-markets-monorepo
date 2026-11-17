@@ -54,6 +54,14 @@ One theme object in `src/constants/theme.ts`. I looked at some examples of exist
 
 Tests are for logic and data hooks rather than UI, covering request handling, error mapping, utils and parsers. Component/screen tests have been done manually.
 
+### Monorepo layout
+
+The project is a pnpm workspace: the Expo app lives in `apps/mobile`, and `packages/api` will hold the API layer (client, schemas, query hooks) so a web app and the planned API proxy can share it. Logic is shared, UI is not; the web app will have its own interface.
+
+Plain pnpm workspaces were chosen over Turborepo or Nx. With two or three packages, a task runner's caching and dependency graph don't save enough time to justify another tool to learn and configure; `pnpm -r` runs lint, typecheck and tests across every package. That would be revisited if CI times grow. Separate repositories were ruled out because shared types would then need publishing and versioning.
+
+Expo configures Metro for monorepos automatically, so there is no custom `metro.config.js`. pnpm's default isolated install is kept rather than `nodeLinker: hoisted`, which keeps each package's dependencies explicit. Hoisting is the fallback if a native library fails to resolve.
+
 ## Known gaps and what I'd do next
 
 - Component/screen tests with React Native Testing Library.
