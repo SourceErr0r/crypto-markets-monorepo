@@ -43,6 +43,25 @@ describe("coin details and history", () => {
     expect(options.signal).toBe(controller.signal);
   });
 
+  it("requests coin details in one currency, without an API key", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "bitcoin",
+        name: "Bitcoin",
+        symbol: "btc",
+        market_data: { current_price: { eur: 1 } },
+      }),
+    });
+    await getCryptocurrencyDetails("bitcoin", "eur");
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain("/coins/bitcoin?");
+    expect(new URL(url).searchParams.get("vs_currency")).toBe("eur");
+    // The key lives in the proxy; the app sends no credentials at all.
+    expect(options.headers).toBeUndefined();
+  });
+
   it("preserves missing statistics and zero values without inventing data", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -56,7 +75,7 @@ describe("coin details and history", () => {
         },
       }),
     });
-    const details = await getCryptocurrencyDetails("bitcoin");
+    const details = await getCryptocurrencyDetails("bitcoin", "gbp");
     expect(details.market_data.current_price).toEqual({ gbp: 0, usd: null });
     expect(details.market_data.max_supply).toBeNull();
     expect(details.market_data.ath).toEqual({});
@@ -68,7 +87,7 @@ describe("coin details and history", () => {
     "rejects malformed detail data: %p",
     async (data) => {
       fetchMock.mockResolvedValue({ ok: true, json: async () => data });
-      await expect(getCryptocurrencyDetails("bitcoin")).rejects.toThrow(
+      await expect(getCryptocurrencyDetails("bitcoin", "gbp")).rejects.toThrow(
         INVALID_RESPONSE_MESSAGE,
       );
     },
@@ -176,12 +195,12 @@ describe("getTopCryptocurrencies", () => {
     expect(searchParams.get("page")).toBe("1");
   });
 
-  it("maps CoinGecko errors to friendly messages without exposing raw ones", async () => {
+  it("maps proxy errors to friendly messages without exposing raw ones", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 429,
       json: jest.fn().mockResolvedValue({
-        status: { error_code: 429, error_message: "Rate limit exceeded" },
+        error: { code: "rate_limited", message: "Rate limit exceeded" },
       }),
     });
 
@@ -190,27 +209,15 @@ describe("getTopCryptocurrencies", () => {
     expect(error).toMatchObject({
       message: expect.stringContaining("Too many requests"),
       status: 429,
-      code: 429,
+      code: "rate_limited",
     });
     expect((error as Error).message).not.toContain("Rate limit exceeded");
-  });
-
-  it("prefers CoinGecko error codes over the HTTP status", async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: async () => ({ status: { error_code: 10005 } }),
-    });
-
-    await expect(getTopCryptocurrencies("usd")).rejects.toThrow(
-      "isn't available with the current CoinGecko plan",
-    );
   });
 
   it("handles error responses that are not JSON", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
-      status: 503,
+      status: 502,
       json: async () => {
         throw new SyntaxError("Unexpected token <");
       },
@@ -257,10 +264,13 @@ describe("getTopCryptocurrencies", () => {
 });
 
 describe("searchCryptocurrencies", () => {
-  it("does not call the API for a blank query", async () => {
-    await expect(searchCryptocurrencies("   ")).resolves.toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+  it.each(["   ", " b "])(
+    "does not call the API for a query under two characters: %p",
+    async (query) => {
+      await expect(searchCryptocurrencies(query)).resolves.toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("encodes the trimmed query and keeps only the fields the app uses", async () => {
     fetchMock.mockResolvedValue({

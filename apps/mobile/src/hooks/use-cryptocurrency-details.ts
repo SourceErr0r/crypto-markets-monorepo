@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getCryptocurrencyDetails } from "@/api/coingecko";
 import { getErrorMessage } from "@/api/coingecko-errors";
+import type { CurrencyCode } from "@/constants/currencies";
 
-export function useCryptocurrencyDetails(id: string) {
+// Keyed by currency because the API returns market data in one currency.
+export function useCryptocurrencyDetails(id: string, currency: CurrencyCode) {
   const { data, error, refetch } = useQuery({
-    queryKey: ["cryptocurrency", id],
-    queryFn: ({ signal }) => getCryptocurrencyDetails(id, signal),
+    queryKey: ["cryptocurrency", id, currency],
+    queryFn: ({ signal }) => getCryptocurrencyDetails(id, currency, signal),
   });
 
   return {

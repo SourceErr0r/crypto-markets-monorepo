@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { searchCryptocurrencies } from "@/api/coingecko";
+import { MIN_SEARCH_LENGTH, searchCryptocurrencies } from "@/api/coingecko";
 import { getErrorMessage } from "@/api/coingecko-errors";
 
-// CoinGecko's free tier is rate limited, so wait for typing to pause.
+// The API is rate limited, so wait for typing to pause.
 const DEBOUNCE_MS = 400;
 
 export function useCryptocurrencySearch(query: string) {
@@ -19,10 +19,11 @@ export function useCryptocurrencySearch(query: string) {
   const { data, error, isFetching, refetch } = useQuery({
     queryKey: ["cryptocurrency-search", debouncedTerm],
     queryFn: ({ signal }) => searchCryptocurrencies(debouncedTerm, signal),
-    enabled: debouncedTerm !== "",
+    enabled: debouncedTerm.length >= MIN_SEARCH_LENGTH,
   });
 
-  const hasTerm = term !== "";
+  // Shorter terms are treated as no search yet, so the screen keeps its hint.
+  const hasTerm = term.length >= MIN_SEARCH_LENGTH;
   // Covers both the debounce wait and any in-flight request, including retries.
   const isLoading = hasTerm && (term !== debouncedTerm || isFetching);
   return {

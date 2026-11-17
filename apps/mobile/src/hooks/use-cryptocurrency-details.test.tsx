@@ -18,18 +18,22 @@ describe("useCryptocurrencyDetails", () => {
 
   it("returns the coin once it has loaded", async () => {
     getDetails.mockResolvedValue(bitcoin);
-    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin"), {
+    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
       wrapper: createQueryWrapper(),
     });
 
     expect(result.current.data).toBeUndefined();
     await waitFor(() => expect(result.current.data).toEqual(bitcoin));
-    expect(getDetails).toHaveBeenCalledWith("bitcoin", expect.any(AbortSignal));
+    expect(getDetails).toHaveBeenCalledWith(
+      "bitcoin",
+      "gbp",
+      expect.any(AbortSignal),
+    );
   });
 
   it("never shows raw error messages from unexpected failures", async () => {
     getDetails.mockRejectedValue(new TypeError("undefined is not an object"));
-    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin"), {
+    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
       wrapper: createQueryWrapper(),
     });
 
@@ -38,7 +42,7 @@ describe("useCryptocurrencyDetails", () => {
 
   it("reports the error message and clears it when retried", async () => {
     getDetails.mockRejectedValueOnce(new CoinGeckoError("Coin not found"));
-    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin"), {
+    const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
       wrapper: createQueryWrapper(),
     });
 
