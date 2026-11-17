@@ -50,8 +50,10 @@ describe('formatted number decimal policy', () => {
     expect(formatNumber(123)).toBe('123');
     expect(formatNumber(123.999)).toBe('124');
     expect(formatNumber(-123.8)).toBe('-123.80');
-    expect(formatNumber(1500000, { notation: 'compact' })).toBe('1.50M');
-    expect(formatNumber(2000000, { notation: 'compact' })).toBe('2M');
+    // The suffix's case comes from the runtime's ICU locale data (newer en-GB
+    // data uses "m"), so only the decimal handling before it is asserted.
+    expect(formatNumber(1500000, { notation: 'compact' })).toMatch(/^1\.50[mM]$/);
+    expect(formatNumber(2000000, { notation: 'compact' })).toMatch(/^2[mM]$/);
   });
 
   it('keeps micro prices from rounding to zero', () => {
