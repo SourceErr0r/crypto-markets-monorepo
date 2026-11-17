@@ -1,0 +1,43 @@
+# Lint, typecheck and test every workspace package: the same commands
+# developers run locally from the repo root.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege: the job only needs to read the repo.
+permissions:
+  contents: read
+
+# A new push to the same branch or PR cancels the run it replaces.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One job, not one per check: install is most of the run time, so
+  # parallel jobs would mostly repeat it.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Version comes from "packageManager" in the root package.json.
+      # Must run before setup-node so its pnpm cache can find pnpm.
+      - uses: pnpm/action-setup@v6
+
+      # Caches pnpm's package store (not node_modules), keyed on pnpm-lock.yaml.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Fails if pnpm-lock.yaml is out of date with any package.json.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
