@@ -13,49 +13,46 @@ Design decisions and an audit of the API layer, with the plan for what comes nex
 - A current Node.js LTS release.
 - pnpm 9 or later. Enable it with `corepack enable`, or install it with `npm install -g pnpm`.
 - Xcode with an iOS Simulator, or Android Studio with an Android emulator.
-- Optional: a free [CoinGecko Demo API key](https://www.coingecko.com/en/api/pricing). See [API key](#api-key).
+- Optional: a free [CoinGecko Demo API key](https://www.coingecko.com/en/api/pricing). See [API proxy and key](#api-proxy-and-key).
 
 ## Build and run
 
+The app gets its data from a small API proxy (`apps/proxy`, a Cloudflare Worker) that runs locally. Start it first, then the app, in two terminals from the repository root:
+
 ```bash
 pnpm install
-pnpm start
+pnpm proxy     # terminal 1: API proxy on http://localhost:8787
+pnpm start     # terminal 2: Expo development server
 ```
 
-Run commands from the repository root. With the Expo development server running, press `i` to open the iOS Simulator or `a` to open an Android emulator. `pnpm web` also starts a web version.
+With the Expo development server running, press `i` to open the iOS Simulator or `a` to open an Android emulator. Both can run side by side: the app reaches the proxy at `localhost` on iOS and web, and at `10.0.2.2` (the emulator's address for your machine) on Android. `pnpm web` also starts a web version.
 
-The app runs without any configuration. Add an API key if you want higher rate limits.
+Both run without any configuration. Add an API key if you want higher rate limits.
 
-## API key
+**Physical device:** start the proxy with `pnpm proxy --ip 0.0.0.0`, then set `EXPO_PUBLIC_API_BASE_URL=http://<your-LAN-IP>:8787` in `apps/mobile/.env.local` (copy it from `apps/mobile/.env.example`). Restart the Expo server after changing it.
 
-The app talks directly to CoinGecko's public API (`https://api.coingecko.com/api/v3`).
+## API proxy and key
 
-- **Without a key** the app works, but CoinGecko applies a lower, shared rate limit to unauthenticated requests. If you hit it, the app shows a "Too many requests" message. Wait a minute and retry.
-- **With a Demo key** requests are sent with the `x-cg-demo-api-key` header and get a more generous limit. Only Demo keys are supported. A Pro key will be rejected because the app uses the public endpoint.
+The app never talks to CoinGecko directly. It calls the proxy, which holds the CoinGecko key, allows only the four endpoints the app uses, caches responses and rate-limits each IP. The design and its limits are in [docs/DECISIONS.md](docs/DECISIONS.md#api-proxy).
 
-To add a key, create a local environment file from the example. Expo reads it from the app's folder:
+- **Without a key** the proxy uses CoinGecko's keyless public tier, which has a lower, shared rate limit. If you hit it, the app shows a "busy" message. Wait a minute and retry.
+- **With a Demo key** the proxy sends it with every request. Only Demo keys are supported.
+
+To add a key, create the proxy's local secrets file from the example and add your key:
 
 ```bash
-cp apps/mobile/.env.example apps/mobile/.env.local
+cp apps/proxy/.dev.vars.example apps/proxy/.dev.vars
 ```
-
-Then add your key to `apps/mobile/.env.local`:
 
 ```env
-EXPO_PUBLIC_COINGECKO_API_KEY=your_coin_gecko_demo_key
+COINGECKO_API_KEY=your_coin_gecko_demo_key
 ```
 
-Restart the Expo development server after changing environment configuration, then fully reload the app in the simulator.
-
-### API key security
-
-The app calls CoinGecko directly and intentionally does not include a backend proxy. Expo exposes variables prefixed with `EXPO_PUBLIC_` to client code, so this API key is a public, revocable client credential rather than a server secret.
-
-Use a dedicated, low-privilege CoinGecko Demo key and keep it in `.env.local`, which is excluded from version control. A production application should move CoinGecko requests behind a server-side proxy, where the key can remain secret.
+`.dev.vars` is excluded from version control. Restart the proxy after changing it. A deployed Worker reads the key from a secret (`wrangler secret put COINGECKO_API_KEY`) instead.
 
 ## Data fetching and caching
 
-Server data is fetched with [TanStack Query](https://tanstack.com/query). It caches responses per query key for five minutes, de-duplicates in-flight requests, cancels abandoned ones and handles retries. This keeps range switching on the price chart instant and reduces pressure on CoinGecko's rate limits, without hand-written cache code. Response validation lives in `apps/mobile/src/api/coingecko-parsers.ts`.
+Server data is fetched with [TanStack Query](https://tanstack.com/query). It caches responses per query key for five minutes, de-duplicates in-flight requests, cancels abandoned ones and handles retries. This keeps range switching on the price chart instant without hand-written cache code. The proxy adds a second, shared cache, so many users are served by one upstream call. Response validation lives in `apps/mobile/src/api/coingecko-parsers.ts`.
 
 ## Project structure
 
@@ -69,9 +66,10 @@ apps/
       screens/      Screen-level components
       components/   Reusable UI components
       hooks/        Data-fetching hooks built on TanStack Query
-      api/          CoinGecko requests, response parsers, error mapping and types
+      api/          API requests, response parsers, error mapping and types
       utils/        Formatting and chart helpers
       constants/    Currencies, locale and theme
+  proxy/          API proxy (Cloudflare Worker): allow-list, caching, rate limiting
 packages/
   api/            Shared API layer (empty for now; the client and hooks will move here)
 ```
@@ -83,6 +81,7 @@ pnpm start        # Start Expo
 pnpm ios          # Start Expo and open iOS Simulator
 pnpm android      # Start Expo and open Android emulator
 pnpm web          # Start the web version
+pnpm proxy        # Start the API proxy locally
 pnpm test         # Run tests in every workspace package
 pnpm lint         # Lint every workspace package
 pnpm typecheck    # Type-check every workspace package
