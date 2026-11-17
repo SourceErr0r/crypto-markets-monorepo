@@ -12,8 +12,8 @@ Expo / React Native app showing CoinGecko market data. Mobile-first, also runs o
 - Expo SDK 57, React Native 0.86 (New Architecture), React 19, TypeScript
 - Expo Router (file-based routes), TanStack Query for server state
 - Jest + jest-expo + React Native Testing Library
-- pnpm (`pnpm-lock.yaml`)
-- CoinGecko API, key from `.env.local` (see `.env.example`)
+- pnpm workspaces (`pnpm-workspace.yaml`, one `pnpm-lock.yaml` at the root)
+- CoinGecko API, key from `apps/mobile/.env.local` (see `apps/mobile/.env.example`)
 
 ## Expo has changed: do not trust your training data
 
@@ -21,30 +21,45 @@ Expo ships breaking changes every SDK release. Before writing code that touches 
 
 ## Commands
 
+From the repo root (`lint`, `typecheck`, `test` run in every workspace package):
+
+```bash
+pnpm install                # install all workspaces
+pnpm start                  # Expo dev server (apps/mobile)
+pnpm lint                   # lint
+pnpm typecheck              # tsc --noEmit
+pnpm test                   # jest
+```
+
+From `apps/mobile`:
+
 ```bash
 npx expo install <package>  # ALWAYS use instead of pnpm add; resolves SDK-compatible versions
-pnpm start                  # dev server
-pnpm lint                   # expo lint
-npx tsc --noEmit            # typecheck
-pnpm test                   # jest
 npx expo-doctor             # diagnose dependency/config issues
+pnpm test <path>            # targeted tests, e.g. pnpm test src/utils
 ```
+
+Workspace packages are referenced as `"@crypto-markets/api": "workspace:*"`. Expo configures Metro for monorepos automatically; don't add `watchFolders` or other resolver overrides.
 
 Run lint and typecheck before declaring a task done.
 
 ## Structure
 
 ```
-src/
-  app/         Expo Router routes only (_layout.tsx = navigators). No other code here.
-  screens/     Screen components rendered by routes
-  components/  Small presentational components
-  hooks/       TanStack Query hooks (one per data need)
-  api/         CoinGecko client, response types, parsers, errors
-  utils/       Pure helpers (formatting, chart data)
-  constants/   Theme, currencies, locale
-  test/        Shared test helpers
-docs/          Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
+apps/
+  mobile/        Expo app (own package.json, app.json, tsconfig, jest, eslint)
+    src/
+      app/         Expo Router routes only (_layout.tsx = navigators). No other code here.
+      screens/     Screen components rendered by routes
+      components/  Small presentational components
+      hooks/       TanStack Query hooks (one per data need)
+      api/         CoinGecko client, response types, parsers, errors
+      utils/       Pure helpers (formatting, chart data)
+      constants/   Theme, currencies, locale
+      test/        Shared test helpers
+packages/
+  api/           @crypto-markets/api: shared API layer (empty; client and hooks move here)
+docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
 ```
 
 ## Conventions
@@ -61,7 +76,7 @@ docs/          Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
 
 ## Don't
 
-- Don't create or edit `ios/` or `android/` by hand. They are generated (CNG); configure via `app.json` and config plugins.
+- Don't create or edit `apps/mobile/ios/` or `apps/mobile/android/` by hand. They are generated (CNG); configure via `app.json` and config plugins.
 - Don't commit secrets, `.env*.local` or `.dev.vars`.
 - Don't use `any`.
 - Don't silently swallow API errors.
