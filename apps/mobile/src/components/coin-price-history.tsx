@@ -8,8 +8,12 @@ import {
   View,
 } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
+import {
+  usePriceHistory,
+  type HistoryDays,
+  type PriceHistoryPoint,
+} from "@crypto-markets/api";
 
-import type { HistoryDays, PriceHistoryPoint } from "@/api/coingecko.types";
 import {
   DetailSection,
   LoadState,
@@ -19,7 +23,6 @@ import type { CurrencyCode } from "@/constants/currencies";
 import { currencies } from "@/constants/currencies";
 import { LOCALE } from "@/constants/locale";
 import { theme } from "@/constants/theme";
-import { usePriceHistory } from "@/hooks/use-price-history";
 import {
   priceChartData,
   timeLabel,

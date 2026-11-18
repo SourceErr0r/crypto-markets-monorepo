@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCryptocurrencyDetails } from "@crypto-markets/api";
 
 import { CoinAbout } from "@/components/coin-about";
 import { LoadState, MutedText } from "@/components/coin-details-ui";
@@ -18,7 +19,6 @@ import {
   type CurrencyCode,
 } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
-import { useCryptocurrencyDetails } from "@/hooks/use-cryptocurrency-details";
 import { formatDate } from "@/utils/coin-details";
 
 export default function CryptocurrencyDetailsScreen() {

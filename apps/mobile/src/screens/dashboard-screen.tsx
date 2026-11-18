@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { useCryptocurrencies } from "@crypto-markets/api";
 
 import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
@@ -12,7 +13,6 @@ import { SearchButton } from "@/components/search-button";
 import { StateMessage } from "@/components/state-message";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
-import { useCryptocurrencies } from "@/hooks/use-cryptocurrencies";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();

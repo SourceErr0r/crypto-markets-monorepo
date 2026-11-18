@@ -1,154 +1,72 @@
+import { http, HttpResponse, type JsonBodyType } from "msw";
+import { describe, expect, it } from "vitest";
+
+import { createApiClient } from "./client";
 import {
-  CoinGeckoError,
+  ApiError,
   INVALID_RESPONSE_MESSAGE,
   NETWORK_ERROR_MESSAGE,
-} from "@/api/coingecko-errors";
+} from "./errors";
 import {
-  getCryptocurrencyDetails,
-  getCryptocurrencyPriceHistory,
-  searchCryptocurrencies,
-  getTopCryptocurrencies,
-} from "@/api/coingecko";
+  coinDetailsFixture,
+  marketsFixture,
+  proxyError,
+  TEST_BASE_URL,
+} from "./testing";
+import { server } from "./testing/server";
 
-const fetchMock = jest.fn();
+const api = createApiClient(TEST_BASE_URL);
 
-beforeEach(() => {
-  fetchMock.mockReset();
-  globalThis.fetch = fetchMock as typeof fetch;
-});
-
-describe("coin details and history", () => {
-  it("requests history in the selected currency and range, and forwards cancellation", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        prices: [
-          [2000, 12],
-          [1000, 10],
-          [2000, 13],
-        ],
-      }),
-    });
-    const controller = new AbortController();
-    await expect(
-      getCryptocurrencyPriceHistory("coin/id", "eur", 30, controller.signal),
-    ).resolves.toEqual([
-      [1000, 10],
-      [2000, 13],
-    ]);
-    const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toContain("/coins/coin%2Fid/market_chart?");
-    expect(new URL(url).searchParams.get("vs_currency")).toBe("eur");
-    expect(new URL(url).searchParams.get("days")).toBe("30");
-    expect(options.signal).toBe(controller.signal);
-  });
-
-  it("requests coin details in one currency, without an API key", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        id: "bitcoin",
-        name: "Bitcoin",
-        symbol: "btc",
-        market_data: { current_price: { eur: 1 } },
-      }),
-    });
-    await getCryptocurrencyDetails("bitcoin", "eur");
-
-    const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toContain("/coins/bitcoin?");
-    expect(new URL(url).searchParams.get("vs_currency")).toBe("eur");
-    // The key lives in the proxy; the app sends no credentials at all.
-    expect(options.headers).toBeUndefined();
-  });
-
-  it("preserves missing statistics and zero values without inventing data", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        id: "bitcoin",
-        name: "Bitcoin",
-        symbol: "btc",
-        market_data: {
-          current_price: { gbp: 0, usd: "invalid" },
-          max_supply: null,
-        },
-      }),
-    });
-    const details = await getCryptocurrencyDetails("bitcoin", "gbp");
-    expect(details.market_data.current_price).toEqual({ gbp: 0, usd: null });
-    expect(details.market_data.max_supply).toBeNull();
-    expect(details.market_data.ath).toEqual({});
-    expect(details.description.en).toBe("");
-    expect(details.links.homepage).toEqual([]);
-  });
-
-  it.each([null, {}, { id: "bitcoin", name: "Bitcoin", symbol: "btc" }])(
-    "rejects malformed detail data: %p",
-    async (data) => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => data });
-      await expect(getCryptocurrencyDetails("bitcoin", "gbp")).rejects.toThrow(
-        INVALID_RESPONSE_MESSAGE,
-      );
-    },
+// Replaces the handler for `path` and records the requests that reach it.
+function respondWith(path: string, response: () => Response) {
+  const requests: Request[] = [];
+  server.use(
+    http.get(`${TEST_BASE_URL}${path}`, ({ request }) => {
+      requests.push(request);
+      return response();
+    }),
   );
+  return requests;
+}
 
-  it.each([
-    {},
-    { prices: null },
-    { prices: [[1000, null]] },
-    { prices: [[1000, "12"]] },
-    { prices: [[1000, -1]] },
-  ])("rejects malformed history: %p", async (data) => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => data });
-    await expect(
-      getCryptocurrencyPriceHistory("bitcoin", "gbp", 1),
-    ).rejects.toThrow(INVALID_RESPONSE_MESSAGE);
-  });
-
-  it("allows empty history so the screen can show an empty state", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ prices: [] }),
-    });
-    await expect(
-      getCryptocurrencyPriceHistory("bitcoin", "gbp", 7),
-    ).resolves.toEqual([]);
-  });
-
-  it("shows a friendly message for history rate limits", async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      json: async () => ({ status: { error_message: "Rate limit exceeded" } }),
-    });
-    await expect(
-      getCryptocurrencyPriceHistory("bitcoin", "gbp", 7),
-    ).rejects.toThrow("Too many requests");
-  });
-});
-
-const bitcoinMarket = {
-  id: "bitcoin",
-  symbol: "btc",
-  name: "Bitcoin",
-  image: "https://example.com/bitcoin.png",
-  market_cap_rank: 1,
-  current_price: 50000,
-  total_volume: 1000,
-  market_cap: 2000,
-};
+const respondWithJson = (path: string, body: JsonBodyType) =>
+  respondWith(path, () => HttpResponse.json(body));
 
 describe("getTopCryptocurrencies", () => {
-  it("keeps missing or invalid numbers as null instead of inventing values", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => [
-        { id: "x", symbol: "x", name: "X", current_price: "oops" },
-      ],
-    });
+  it("requests the top ten coins in the selected currency", async () => {
+    const requests = respondWithJson("/coins/markets", marketsFixture);
 
-    await expect(getTopCryptocurrencies("gbp")).resolves.toEqual([
+    const coins = await api.getTopCryptocurrencies("gbp");
+
+    const params = new URL(requests[0].url).searchParams;
+    expect(params.get("vs_currency")).toBe("gbp");
+    expect(params.get("order")).toBe("market_cap_desc");
+    expect(params.get("per_page")).toBe("10");
+    expect(params.get("page")).toBe("1");
+    expect(coins.map((coin) => coin.id)).toEqual(["bitcoin", "ethereum"]);
+  });
+
+  it("keeps only the fields the app uses", async () => {
+    const [bitcoin] = await api.getTopCryptocurrencies("usd");
+
+    expect(bitcoin).toEqual({
+      id: "bitcoin",
+      symbol: "btc",
+      name: "Bitcoin",
+      image: "https://example.com/bitcoin.png",
+      market_cap_rank: 1,
+      current_price: 65000,
+      total_volume: 30000000000,
+      market_cap: 1280000000000,
+    });
+  });
+
+  it("keeps missing or invalid numbers as null instead of inventing values", async () => {
+    respondWithJson("/coins/markets", [
+      { id: "x", symbol: "x", name: "X", current_price: "oops" },
+    ]);
+
+    await expect(api.getTopCryptocurrencies("gbp")).resolves.toEqual([
       {
         id: "x",
         symbol: "x",
@@ -167,133 +85,171 @@ describe("getTopCryptocurrencies", () => {
     null,
     [null],
     [{ id: "bitcoin", name: "Bitcoin" }],
-  ])("rejects malformed market data: %p", async (data) => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => data });
+  ])("rejects malformed market data: %j", async (body) => {
+    respondWithJson("/coins/markets", body);
 
-    await expect(getTopCryptocurrencies("gbp")).rejects.toThrow(
-      INVALID_RESPONSE_MESSAGE,
+    await expect(api.getTopCryptocurrencies("gbp")).rejects.toMatchObject({
+      message: INVALID_RESPONSE_MESSAGE,
+      kind: "invalid-response",
+    });
+  });
+});
+
+describe("getCryptocurrencyDetails", () => {
+  it("requests one currency and sends no credentials", async () => {
+    const requests = respondWithJson("/coins/:id", coinDetailsFixture("eur"));
+
+    const details = await api.getCryptocurrencyDetails("bitcoin", "eur");
+
+    const url = new URL(requests[0].url);
+    expect(url.pathname).toBe("/coins/bitcoin");
+    expect(url.searchParams.get("vs_currency")).toBe("eur");
+    // The key lives in the proxy; the app sends no credentials at all.
+    expect(requests[0].headers.has("authorization")).toBe(false);
+    expect([...requests[0].headers.keys()]).not.toContainEqual(
+      expect.stringMatching(/cg|key/i),
+    );
+    expect(details.market_data.current_price).toEqual({ eur: 65000 });
+  });
+
+  it("encodes the coin id into a single path segment", async () => {
+    const requests = respondWithJson("/coins/:id/market_chart", { prices: [] });
+
+    await api.getCryptocurrencyPriceHistory("coin/id", "gbp", 7);
+
+    expect(new URL(requests[0].url).pathname).toBe(
+      "/coins/coin%2Fid/market_chart",
     );
   });
 
-  it("requests the top ten coins in the selected currency", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue([bitcoinMarket]),
-    });
-
-    await expect(getTopCryptocurrencies("gbp")).resolves.toEqual([
-      bitcoinMarket,
-    ]);
-
-    const [url] = fetchMock.mock.calls[0] as [string];
-    const searchParams = new URL(url).searchParams;
-
-    expect(url).toContain("/coins/markets");
-    expect(searchParams.get("vs_currency")).toBe("gbp");
-    expect(searchParams.get("order")).toBe("market_cap_desc");
-    expect(searchParams.get("per_page")).toBe("10");
-    expect(searchParams.get("page")).toBe("1");
-  });
-
-  it("maps proxy errors to friendly messages without exposing raw ones", async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      json: jest.fn().mockResolvedValue({
-        error: { code: "rate_limited", message: "Rate limit exceeded" },
-      }),
-    });
-
-    const error = await getTopCryptocurrencies("usd").catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(CoinGeckoError);
-    expect(error).toMatchObject({
-      message: expect.stringContaining("Too many requests"),
-      status: 429,
-      code: "rate_limited",
-    });
-    expect((error as Error).message).not.toContain("Rate limit exceeded");
-  });
-
-  it("handles error responses that are not JSON", async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: async () => {
-        throw new SyntaxError("Unexpected token <");
+  it("falls back for missing display fields without inventing data", async () => {
+    respondWithJson("/coins/:id", {
+      id: "bitcoin",
+      name: "Bitcoin",
+      symbol: "btc",
+      market_data: {
+        current_price: { gbp: 0, usd: "invalid" },
+        max_supply: null,
       },
     });
 
-    await expect(getTopCryptocurrencies("usd")).rejects.toThrow(
-      "temporarily unavailable",
-    );
+    const details = await api.getCryptocurrencyDetails("bitcoin", "gbp");
+
+    expect(details.market_data.current_price).toEqual({ gbp: 0, usd: null });
+    expect(details.market_data.max_supply).toBeNull();
+    expect(details.market_data.ath).toEqual({});
+    expect(details.description.en).toBe("");
+    expect(details.links).toEqual({ homepage: [], whitepaper: null });
   });
 
-  it("reports network failures", async () => {
-    fetchMock.mockRejectedValue(new TypeError("Network request failed"));
+  it.each([
+    null,
+    {},
+    { id: "bitcoin", name: "Bitcoin", symbol: "btc" },
+    { id: "", name: "Bitcoin", symbol: "btc", market_data: {} },
+  ])("rejects malformed detail data: %j", async (body) => {
+    respondWithJson("/coins/:id", body);
 
-    await expect(getTopCryptocurrencies("usd")).rejects.toThrow(
-      NETWORK_ERROR_MESSAGE,
-    );
+    await expect(
+      api.getCryptocurrencyDetails("bitcoin", "gbp"),
+    ).rejects.toMatchObject({ kind: "invalid-response" });
   });
 
-  it("reports a successful response with an unreadable body", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => {
-        throw new SyntaxError("Unexpected end of JSON input");
-      },
+  it("reports an unknown coin as not found", async () => {
+    await expect(
+      api.getCryptocurrencyDetails("not-a-coin", "usd"),
+    ).rejects.toMatchObject({
+      message: "We couldn't find that cryptocurrency.",
+      kind: "http",
+      status: 404,
+      code: "not_found",
     });
+  });
+});
 
-    await expect(getTopCryptocurrencies("usd")).rejects.toThrow(
-      INVALID_RESPONSE_MESSAGE,
-    );
+describe("getCryptocurrencyPriceHistory", () => {
+  it("requests the selected currency and range", async () => {
+    const requests = respondWithJson("/coins/:id/market_chart", { prices: [] });
+
+    await api.getCryptocurrencyPriceHistory("bitcoin", "eur", 30);
+
+    const params = new URL(requests[0].url).searchParams;
+    expect(params.get("vs_currency")).toBe("eur");
+    expect(params.get("days")).toBe("30");
   });
 
-  it("lets cancelled requests through unchanged", async () => {
-    const controller = new AbortController();
-    const abortError = new DOMException("Aborted", "AbortError");
-    fetchMock.mockImplementation(async () => {
-      controller.abort();
-      throw abortError;
+  it("sorts points by time and collapses duplicate timestamps", async () => {
+    respondWithJson("/coins/:id/market_chart", {
+      prices: [
+        [2000, 12],
+        [1000, 10],
+        [2000, 13],
+      ],
     });
 
     await expect(
-      getTopCryptocurrencies("usd", controller.signal),
-    ).rejects.toBe(abortError);
+      api.getCryptocurrencyPriceHistory("bitcoin", "gbp", 1),
+    ).resolves.toEqual([
+      [1000, 10],
+      [2000, 13],
+    ]);
+  });
+
+  it("allows empty history so the screen can show an empty state", async () => {
+    respondWithJson("/coins/:id/market_chart", { prices: [] });
+
+    await expect(
+      api.getCryptocurrencyPriceHistory("bitcoin", "gbp", 7),
+    ).resolves.toEqual([]);
+  });
+
+  it.each([
+    {},
+    { prices: null },
+    { prices: [[1000, null]] },
+    { prices: [[1000, "12"]] },
+    { prices: [[1000, -1]] },
+    { prices: [[1000, 10, 5]] },
+  ])("rejects malformed history: %j", async (body) => {
+    respondWithJson("/coins/:id/market_chart", body);
+
+    await expect(
+      api.getCryptocurrencyPriceHistory("bitcoin", "gbp", 1),
+    ).rejects.toMatchObject({ kind: "invalid-response" });
   });
 });
 
 describe("searchCryptocurrencies", () => {
   it.each(["   ", " b "])(
-    "does not call the API for a query under two characters: %p",
+    "does not call the API for a query under two characters: %j",
     async (query) => {
-      await expect(searchCryptocurrencies(query)).resolves.toEqual([]);
-      expect(fetchMock).not.toHaveBeenCalled();
+      const requests = respondWithJson("/search", { coins: [] });
+
+      await expect(api.searchCryptocurrencies(query)).resolves.toEqual([]);
+      expect(requests).toHaveLength(0);
     },
   );
 
-  it("encodes the trimmed query and keeps only the fields the app uses", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        coins: [
-          {
-            id: "bitcoin",
-            name: "Bitcoin",
-            symbol: "BTC",
-            api_symbol: "bitcoin",
-            market_cap_rank: 1,
-            thumb: "thumb.png",
-          },
-          { id: "obscure", name: "Obscure", symbol: "OBS", market_cap_rank: null },
-        ],
-      }),
+  it("sends the trimmed query, encoded, and keeps only the fields the app uses", async () => {
+    const requests = respondWithJson("/search", {
+      coins: [
+        {
+          id: "bitcoin",
+          name: "Bitcoin",
+          symbol: "BTC",
+          api_symbol: "bitcoin",
+          market_cap_rank: 1,
+          thumb: "thumb.png",
+        },
+        { id: "obscure", name: "Obscure", symbol: "OBS", market_cap_rank: null },
+      ],
     });
 
-    const results = await searchCryptocurrencies(" bit & coin ");
+    const results = await api.searchCryptocurrencies(" bit & coin ");
 
-    const [url] = fetchMock.mock.calls[0];
-    expect(new URL(url).searchParams.get("query")).toBe("bit & coin");
+    expect(new URL(requests[0].url).searchParams.get("query")).toBe(
+      "bit & coin",
+    );
     expect(results).toEqual([
       {
         id: "bitcoin",
@@ -313,10 +269,83 @@ describe("searchCryptocurrencies", () => {
   });
 
   it("rejects responses without a coins list", async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
+    respondWithJson("/search", {});
 
-    await expect(searchCryptocurrencies("btc")).rejects.toMatchObject({
+    await expect(api.searchCryptocurrencies("btc")).rejects.toMatchObject({
       message: INVALID_RESPONSE_MESSAGE,
+      kind: "invalid-response",
     });
+  });
+});
+
+// Failure handling is shared by every endpoint, so it's tested through one.
+describe("failures", () => {
+  it.each([
+    [429, "rate_limited", "Too many requests"],
+    [503, "upstream_busy", "busy right now"],
+    [502, "upstream_unavailable", "temporarily unavailable"],
+    [400, "invalid_param", "wasn't valid"],
+  ])(
+    "maps HTTP %i (%s) to a friendly message and keeps the details",
+    async (status, code, message) => {
+      respondWith("/coins/markets", () => proxyError(status, code));
+
+      const error = await api.getTopCryptocurrencies("usd").catch((e) => e);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ kind: "http", status, code });
+      expect(error.message).toContain(message);
+      // The proxy's own message is for developers, not users.
+      expect(error.message).not.toContain("Test error");
+    },
+  );
+
+  it("handles error responses that are not JSON", async () => {
+    respondWith(
+      "/coins/markets",
+      () => new HttpResponse("<html>Bad gateway</html>", { status: 502 }),
+    );
+
+    await expect(api.getTopCryptocurrencies("usd")).rejects.toMatchObject({
+      kind: "http",
+      status: 502,
+      code: undefined,
+    });
+  });
+
+  it("reports network failures", async () => {
+    respondWith("/coins/markets", () => HttpResponse.error());
+
+    await expect(api.getTopCryptocurrencies("usd")).rejects.toMatchObject({
+      message: NETWORK_ERROR_MESSAGE,
+      kind: "network",
+    });
+  });
+
+  it("reports a successful response with an unreadable body", async () => {
+    respondWith(
+      "/coins/markets",
+      () =>
+        new HttpResponse("{ truncated", {
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    await expect(api.getTopCryptocurrencies("usd")).rejects.toMatchObject({
+      message: INVALID_RESPONSE_MESSAGE,
+      kind: "invalid-response",
+    });
+  });
+
+  it("lets cancelled requests through unchanged, not as failures", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const error = await api
+      .getTopCryptocurrencies("usd", controller.signal)
+      .catch((e) => e);
+
+    expect(error).not.toBeInstanceOf(ApiError);
+    expect(error.name).toBe("AbortError");
   });
 });

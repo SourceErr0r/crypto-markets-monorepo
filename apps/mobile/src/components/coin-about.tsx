@@ -1,8 +1,8 @@
 import { openBrowserAsync } from "expo-web-browser";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
+import type { CryptocurrencyDetails } from "@crypto-markets/api";
 
-import type { CryptocurrencyDetails } from "@/api/coingecko";
 import {
   ActionButton,
   DetailSection,

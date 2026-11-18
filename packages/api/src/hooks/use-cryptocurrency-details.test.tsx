@@ -1,25 +1,26 @@
-import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
-import { CoinGeckoError, UNKNOWN_ERROR_MESSAGE } from "@/api/coingecko-errors";
-import {
-  getCryptocurrencyDetails,
-  type CryptocurrencyDetails,
-} from "@/api/coingecko";
-import { useCryptocurrencyDetails } from "@/hooks/use-cryptocurrency-details";
-import { createQueryWrapper } from "@/test/query-wrapper";
+import { ApiError, UNKNOWN_ERROR_MESSAGE } from "../errors";
+import { useCryptocurrencyDetails } from "./use-cryptocurrency-details";
+import { createApiClient, type ApiClient } from "../client";
+import { createWrapper } from "./test-wrapper";
+import type { CryptocurrencyDetails } from "../types";
 
-jest.mock("@/api/coingecko");
-const getDetails = jest.mocked(getCryptocurrencyDetails);
+const getDetails = vi.fn<ApiClient["getCryptocurrencyDetails"]>();
+const api = { ...createApiClient("https://api.test"), getCryptocurrencyDetails: getDetails };
 
 const bitcoin = { id: "bitcoin", name: "Bitcoin" } as CryptocurrencyDetails;
 
 describe("useCryptocurrencyDetails", () => {
-  beforeEach(() => getDetails.mockReset());
+  beforeEach(() => {
+    getDetails.mockReset();
+  });
 
   it("returns the coin once it has loaded", async () => {
     getDetails.mockResolvedValue(bitcoin);
     const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
-      wrapper: createQueryWrapper(),
+      wrapper: createWrapper(api),
     });
 
     expect(result.current.data).toBeUndefined();
@@ -34,16 +35,16 @@ describe("useCryptocurrencyDetails", () => {
   it("never shows raw error messages from unexpected failures", async () => {
     getDetails.mockRejectedValue(new TypeError("undefined is not an object"));
     const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
-      wrapper: createQueryWrapper(),
+      wrapper: createWrapper(api),
     });
 
     await waitFor(() => expect(result.current.error).toBe(UNKNOWN_ERROR_MESSAGE));
   });
 
   it("reports the error message and clears it when retried", async () => {
-    getDetails.mockRejectedValueOnce(new CoinGeckoError("Coin not found"));
+    getDetails.mockRejectedValueOnce(new ApiError("Coin not found", { kind: "http", status: 404 }));
     const { result } = renderHook(() => useCryptocurrencyDetails("bitcoin", "gbp"), {
-      wrapper: createQueryWrapper(),
+      wrapper: createWrapper(api),
     });
 
     await waitFor(() => expect(result.current.error).toBe("Coin not found"));

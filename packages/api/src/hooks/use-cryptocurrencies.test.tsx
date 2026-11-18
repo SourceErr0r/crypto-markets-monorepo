@@ -1,22 +1,26 @@
-import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
-import { CoinGeckoError } from "@/api/coingecko-errors";
-import { getTopCryptocurrencies, type Cryptocurrency } from "@/api/coingecko";
-import { useCryptocurrencies } from "@/hooks/use-cryptocurrencies";
-import { createQueryWrapper } from "@/test/query-wrapper";
+import { ApiError } from "../errors";
+import { useCryptocurrencies } from "./use-cryptocurrencies";
+import { createApiClient, type ApiClient } from "../client";
+import { createWrapper } from "./test-wrapper";
+import type { Cryptocurrency } from "../types";
 
-jest.mock("@/api/coingecko");
-const getTop = jest.mocked(getTopCryptocurrencies);
+const getTop = vi.fn<ApiClient["getTopCryptocurrencies"]>();
+const api = { ...createApiClient("https://api.test"), getTopCryptocurrencies: getTop };
 
 const bitcoin = { id: "bitcoin", name: "Bitcoin" } as Cryptocurrency;
 
 describe("useCryptocurrencies", () => {
-  beforeEach(() => getTop.mockReset());
+  beforeEach(() => {
+    getTop.mockReset();
+  });
 
   it("is loading until the market data arrives", async () => {
     getTop.mockResolvedValue([bitcoin]);
     const { result } = renderHook(() => useCryptocurrencies("gbp"), {
-      wrapper: createQueryWrapper(),
+      wrapper: createWrapper(api),
     });
 
     expect(result.current.isLoading).toBe(true);
@@ -28,9 +32,9 @@ describe("useCryptocurrencies", () => {
   });
 
   it("exposes request errors and recovers when refreshed", async () => {
-    getTop.mockRejectedValueOnce(new CoinGeckoError("Too many requests"));
+    getTop.mockRejectedValueOnce(new ApiError("Too many requests", { kind: "http", status: 429 }));
     const { result } = renderHook(() => useCryptocurrencies("usd"), {
-      wrapper: createQueryWrapper(),
+      wrapper: createWrapper(api),
     });
 
     await waitFor(() => expect(result.current.error).toBe("Too many requests"));
@@ -43,11 +47,25 @@ describe("useCryptocurrencies", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("reuses fresh data instead of calling the API again", async () => {
+    getTop.mockResolvedValue([bitcoin]);
+    const wrapper = createWrapper(api);
+    const first = renderHook(() => useCryptocurrencies("gbp"), { wrapper });
+    await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+    first.unmount();
+
+    // Leaving the screen and coming back within the stale time.
+    const second = renderHook(() => useCryptocurrencies("gbp"), { wrapper });
+
+    expect(second.result.current.cryptocurrencies).toEqual([bitcoin]);
+    expect(getTop).toHaveBeenCalledTimes(1);
+  });
+
   it("loads data again when the currency changes", async () => {
     getTop.mockResolvedValue([bitcoin]);
     const { result, rerender } = renderHook(
       ({ currency }: { currency: "gbp" | "eur" }) => useCryptocurrencies(currency),
-      { wrapper: createQueryWrapper(), initialProps: { currency: "gbp" } },
+      { wrapper: createWrapper(api), initialProps: { currency: "gbp" } },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 

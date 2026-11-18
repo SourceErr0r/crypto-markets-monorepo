@@ -1,10 +1,12 @@
+import { describe, expect, it } from "vitest";
+
 import {
-  CoinGeckoError,
+  ApiError,
   getErrorMessage,
   httpErrorMessage,
   isRetryable,
   UNKNOWN_ERROR_MESSAGE,
-} from "@/api/coingecko-errors";
+} from "./errors";
 
 describe("httpErrorMessage", () => {
   it.each([400, 404, 408, 429, 500, 502, 503, 504])(
@@ -34,8 +36,8 @@ describe("httpErrorMessage", () => {
 });
 
 describe("getErrorMessage", () => {
-  it("returns the message of a CoinGeckoError", () => {
-    expect(getErrorMessage(new CoinGeckoError("Try later"))).toBe("Try later");
+  it("returns the message of a ApiError", () => {
+    expect(getErrorMessage(new ApiError("Try later", { kind: "http", status: 503 }))).toBe("Try later");
   });
 
   it("hides the message of any other error", () => {
@@ -48,15 +50,24 @@ describe("getErrorMessage", () => {
 
 describe("isRetryable", () => {
   it.each([408, 500, 502, 503, 504])("retries HTTP %i", (status) => {
-    expect(isRetryable(new CoinGeckoError("x", { status }))).toBe(true);
+    expect(isRetryable(new ApiError("x", { kind: "http", status }))).toBe(true);
   });
 
   it.each([400, 401, 403, 404, 429])("does not retry HTTP %i", (status) => {
-    expect(isRetryable(new CoinGeckoError("x", { status }))).toBe(false);
+    expect(isRetryable(new ApiError("x", { kind: "http", status }))).toBe(false);
   });
 
-  it("retries failures without a status, such as network errors", () => {
-    expect(isRetryable(new CoinGeckoError("offline"))).toBe(true);
-    expect(isRetryable(new TypeError("unexpected"))).toBe(true);
+  it("retries network failures, which may be a passing connection drop", () => {
+    expect(isRetryable(new ApiError("offline", { kind: "network" }))).toBe(true);
+  });
+
+  it("does not retry a response that failed validation", () => {
+    expect(isRetryable(new ApiError("bad", { kind: "invalid-response" }))).toBe(
+      false,
+    );
+  });
+
+  it("does not retry errors from our own code", () => {
+    expect(isRetryable(new TypeError("x is not a function"))).toBe(false);
   });
 });

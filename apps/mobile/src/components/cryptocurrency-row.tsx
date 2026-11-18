@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import type { Cryptocurrency } from "@crypto-markets/api";
 
-import type { Cryptocurrency } from "@/api/coingecko";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
 import { formatMarketCap, formatPrice } from "@/utils/formatters";
