@@ -7,6 +7,7 @@
     "ios": "pnpm --filter mobile ios",
     "android": "pnpm --filter mobile android",
     "web": "pnpm --filter mobile web",
+    "proxy": "pnpm --filter proxy dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"

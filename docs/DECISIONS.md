@@ -14,9 +14,29 @@ Files in `src/app/` only re-export a screen from `src/screens/`. Routing stays d
 
 Search is a modal presentation and the detail view is a normal stack push. Selecting a search result uses `router.replace`, which replaces the search modal with the details screen on the main stack, allowing the user to return to the dashboard.
 
-### Direct CoinGecko calls
+### API proxy
 
-A full implementation would use a server-side proxy to keep keys secure. The brief here was to use direct integration and the goal is an app running locally, so the decision was made to put the key into an `EXPO_PUBLIC_` variable. A production build of the app would not be secure for this reason, but it will suffice for this project.
+The take-home brief asked for direct CoinGecko calls with no backend, so the key lived in an `EXPO_PUBLIC_` variable. Expo inlines those into the bundle, which made the key public. That was acceptable for a local demo, not for a release.
+
+The app now talks only to a Cloudflare Worker (`apps/proxy`), which holds the key as a Worker secret (`.dev.vars` locally) and calls CoinGecko on the app's behalf. The app has no key and sends no credentials.
+
+**Allow-list, not pass-through.** The proxy rebuilds each request rather than forwarding it. Only four routes exist: markets, coin detail, price history and search. Each parameter is checked against a fixed set (currencies, `per_page`, page range, chart ranges of 1, 7, 30, 90 or 365 days, search length 2–50), and the proxy sets the rest itself, such as sort order and coin detail flags. Anything else gets a 404 or 400 without reaching CoinGecko. CoinGecko's own paths that sit where a coin id would (`/coins/list`, `/coins/categories`) are reserved, so they can't be reached as coin ids.
+
+**Caching is a budget decision.** CoinGecko's Demo plan allows 10,000 calls a month, about 14 an hour, so the monthly cap is the real limit. A cache entry refreshed every T minutes costs at most 43,200 / T calls a month however many people use the app, so each route's cache lifetime is chosen with that in mind: markets 15 minutes, coin detail 10, search an hour, charts from 5 minutes (1 day, 5-minute points) to 6 hours (1 year, daily points). Because the request is rebuilt in a fixed form, equivalent requests (`GBP` and `gbp`, extra or reordered params) share one cache entry.
+
+Responses are cached in Workers KV. The Cache API is the usual choice, but it only stores responses on a custom domain, not on a `*.workers.dev` address. KV is eventually consistent and two simultaneous misses both go upstream; at this traffic level that's acceptable, and Durable Objects would be the fix if it weren't. Entries are kept for 24 hours but are only fresh for their route's lifetime, so when CoinGecko fails the proxy serves the last good copy (marked `X-Cache: STALE`) instead of an error. Every response carries an `Age` header so the app can show how old the data is.
+
+**One response per coin, trimmed per currency.** Coin detail comes back with market data in every currency CoinGecko supports, about 60, when the screen shows one. The proxy caches the full response once per coin and returns only the requested currency, so one upstream call serves every currency and the payload drops from about 31 KB to 6 KB.
+
+**Rate limiting.** Each IP gets 60 requests a minute (Workers Rate Limiting binding), with a 429 and `Retry-After` beyond that. The limit is generous because many mobile users can share one IP behind carrier NAT. Counts are kept per Cloudflare location and are approximate, which is fine for abuse control but not for billing.
+
+**Errors.** Every error has one shape, `{ "error": { "code", "message" } }`, with a stable `code` for clients. CoinGecko's statuses are never passed through: a 401 means the proxy's key is wrong, which no client can fix, so it becomes a 502 and is logged. CoinGecko's own 429 becomes a 503 with `Retry-After`, because a 429 would wrongly tell the client that *it* sent too many requests. Upstream calls time out after 10 seconds, and a body that isn't JSON is never cached or served.
+
+**What it protects against, and what it doesn't.**
+
+- It does keep the key secret, limit what can be requested to four read-only endpoints with bounded params, cap how hard one IP can call it, and stop repeat traffic from reaching CoinGecko.
+- It doesn't stop anyone else from calling it. Any value the app could send to prove it's the real app would ship in the bundle and could be copied, just like the key. CORS only restricts browsers, and `Origin` headers can be faked outside one. The data is public, so the worst case is someone using the proxy as rate-limited access to the same four endpoints.
+- It doesn't fully protect the monthly budget. Coin detail, charts and search have unbounded keys (any coin, any query), so a determined client spread across many IPs can still miss the cache. The next steps would be a global budget guard (stretch cache lifetimes or serve stale once spend passes a threshold), short caching of 404s, and restricting CORS to the web app's domain once it's deployed. Real client verification would mean App Attest and Play Integrity on mobile and Turnstile on web, which is out of scope for public market data.
 
 ### A small API layer with hand-written parsers
 
@@ -24,13 +44,13 @@ A full implementation would use a server-side proxy to keep keys secure. The bri
 
 I opted to use hand-written parsers rather than a schema library such as Zod to avoid adding a dependency and extra complexity for the sake of only four endpoints.
 
-Errors are mapped to user-safe messages. CoinGecko's own error codes take precedence over HTTP status. Raw messages never reach the UI.
+Errors are mapped to user-safe messages by HTTP status; the proxy's error `code` is kept on the error for debugging. The copy never names the upstream provider or mentions keys. Raw messages never reach the UI.
 
 ### Search uses CoinGecko's `/search` endpoint
 
 The dashboard only holds the top 10 coins, so searching that list wouldn't let someone find anything else. Search therefore calls CoinGecko's `/search` endpoint, which matches on name and symbol across every listed coin. Matching and ranking are handled by CoinGecko, so I don't filter or re-order the results on the client.
 
-Input is debounced by 400ms, and an empty or whitespace-only query never makes a request. This keeps the number of calls down on a rate-limited API. Results are cached per search term by React Query, so repeating a recent search is instant. Selecting a result opens the same detail screen as the dashboard.
+Input is debounced by 400ms, and a query shorter than two characters never makes a request (the proxy rejects it too: one-letter queries match almost everything and each one is a separate, uncached upstream call). This keeps the number of calls down on a rate-limited API. Results are cached per search term by React Query, so repeating a recent search is instant. Selecting a result opens the same detail screen as the dashboard.
 
 The trade-off is that search needs a network connection and spends API calls, whereas filtering a locally cached list would be instant and free. Search results can also include obscure tokens with very little data, so the parsers and the detail screen treat missing fields as normal rather than as errors. The search screen has distinct states for loading, no results, and failure with a retry.
 
@@ -54,6 +74,8 @@ One theme object in `src/constants/theme.ts`. I looked at some examples of exist
 
 Tests are for logic and data hooks rather than UI, covering request handling, error mapping, utils and parsers. Component/screen tests have been done manually.
 
+The proxy is tested with Vitest inside the Workers runtime (`@cloudflare/vitest-plugin`), against local KV and rate-limit bindings, with CoinGecko replaced by a stub of `fetch`. The tests cover the allow-list, cache key normalisation, hits and refreshes, trimming, serving stale data on failure, error mapping and the per-IP limit. Jest stays in the mobile app because `jest-expo` is the supported setup there; the proxy needs the Workers runtime, which Jest can't provide.
+
 ### Monorepo layout
 
 The project is a pnpm workspace: the Expo app lives in `apps/mobile`, and `packages/api` will hold the API layer (client, schemas, query hooks) so a web app and the planned API proxy can share it. Logic is shared, UI is not; the web app will have its own interface.
@@ -66,12 +88,12 @@ Expo configures Metro for monorepos automatically, so there is no custom `metro.
 
 A single GitHub Actions workflow runs on every pull request and on pushes to `main`. It installs with a frozen lockfile, then runs `pnpm lint`, `pnpm typecheck` and `pnpm test` across every workspace package: the same commands used locally. Node is pinned in `.nvmrc` and pnpm in the root `package.json` `packageManager` field, so local and CI toolchains match.
 
-It is one job rather than one per check. Installing dependencies is most of the run time, so parallel jobs would mostly repeat it. Every package is checked on every run; running only the packages affected by a change (`pnpm --filter "...[origin/main]"` or a task runner) would be worth it once there are several apps and CI time grows. Actions are pinned to major version tags; pinning to commit SHAs with Dependabot updates is the stricter option. No secrets are needed, since the CoinGecko key is optional.
+It is one job rather than one per check. Installing dependencies is most of the run time, so parallel jobs would mostly repeat it. Every package is checked on every run; running only the packages affected by a change (`pnpm --filter "...[origin/main]"` or a task runner) would be worth it once there are several apps and CI time grows. Actions are pinned to major version tags; pinning to commit SHAs with Dependabot updates is the stricter option. No secrets are needed: the proxy tests use a fake key and never call CoinGecko.
 
 ## Known gaps and what I'd do next
 
 - Component/screen tests with React Native Testing Library.
-- Move CoinGecko calls behind a proxy so the key stays secret.
+- Deploy the proxy from CI, and add the global budget guard described under [API proxy](#api-proxy).
 - Persist the selected currency and share it through context rather than route params.
 - Fold the detail screen's inline `LoadState` into the shared `StateMessage` (they are visually different, so left separate for now).
 - Pull-to-refresh exists on the dashboard only; the detail screen refreshes on retry after an error.

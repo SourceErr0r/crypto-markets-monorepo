@@ -13,7 +13,7 @@ Expo / React Native app showing CoinGecko market data. Mobile-first, also runs o
 - Expo Router (file-based routes), TanStack Query for server state
 - Jest + jest-expo + React Native Testing Library
 - pnpm workspaces (`pnpm-workspace.yaml`, one `pnpm-lock.yaml` at the root)
-- CoinGecko API, key from `apps/mobile/.env.local` (see `apps/mobile/.env.example`)
+- CoinGecko API via `apps/proxy` (Cloudflare Worker); key in `apps/proxy/.dev.vars`, never in the app
 
 ## Expo has changed: do not trust your training data
 
@@ -26,6 +26,7 @@ From the repo root (`lint`, `typecheck`, `test` run in every workspace package):
 ```bash
 pnpm install                # install all workspaces
 pnpm start                  # Expo dev server (apps/mobile)
+pnpm proxy                  # API proxy on :8787 (wrangler dev; key in apps/proxy/.dev.vars)
 pnpm lint                   # lint
 pnpm typecheck              # tsc --noEmit
 pnpm test                   # jest
@@ -53,10 +54,12 @@ apps/
       screens/     Screen components rendered by routes
       components/  Small presentational components
       hooks/       TanStack Query hooks (one per data need)
-      api/         CoinGecko client, response types, parsers, errors
+      api/         API client (talks to apps/proxy), response types, parsers, errors
       utils/       Pure helpers (formatting, chart data)
       constants/   Theme, currencies, locale
       test/        Shared test helpers
+  proxy/         Cloudflare Worker in front of CoinGecko: allow-list, KV cache, rate limit.
+                 Tests run in the Workers runtime (Vitest + @cloudflare/vitest-plugin).
 packages/
   api/           @crypto-markets/api: shared API layer (empty; client and hooks move here)
 docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
@@ -88,7 +91,7 @@ docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facin
 
 ## Product requirements
 
-Top 10 coins by market cap. Open a coin for details. Search by name or symbol. Handle loading and API errors. Work well on mobile screen sizes. Talk to CoinGecko directly (a proxy is planned). Easy for another developer to run locally.
+Top 10 coins by market cap. Open a coin for details. Search by name or symbol. Handle loading and API errors. Work well on mobile screen sizes. Data comes from CoinGecko through the API proxy; the app holds no key. Easy for another developer to run locally.
 
 ## When done
 

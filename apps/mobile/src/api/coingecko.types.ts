@@ -50,11 +50,3 @@ export type CryptocurrencySearchResult = {
   market_cap_rank: number | null;
   thumb: string;
 };
-
-export type CoinGeckoErrorResponse = {
-  error?: string;
-  status?: {
-    error_code?: number;
-    error_message?: string;
-  };
-};

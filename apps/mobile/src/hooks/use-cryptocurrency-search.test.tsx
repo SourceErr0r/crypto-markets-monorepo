@@ -20,8 +20,8 @@ describe("useCryptocurrencySearch", () => {
   });
   afterEach(() => jest.useRealTimers());
 
-  it("does not search for an empty query", () => {
-    const { result } = renderHook(() => useCryptocurrencySearch("  "), {
+  it.each(["  ", "b"])("does not search for a query under two characters: %p", (query) => {
+    const { result } = renderHook(() => useCryptocurrencySearch(query), {
       wrapper: createQueryWrapper(),
     });
 

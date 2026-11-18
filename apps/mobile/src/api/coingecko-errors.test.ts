@@ -7,7 +7,7 @@ import {
 } from "@/api/coingecko-errors";
 
 describe("httpErrorMessage", () => {
-  it.each([400, 401, 403, 404, 408, 429, 500, 502, 503, 504])(
+  it.each([400, 404, 408, 429, 500, 502, 503, 504])(
     "has a message for HTTP %i",
     (status) => {
       expect(httpErrorMessage(status)).not.toBe(UNKNOWN_ERROR_MESSAGE);
@@ -18,20 +18,18 @@ describe("httpErrorMessage", () => {
     expect(httpErrorMessage(429)).toMatch(/too many requests/i);
   });
 
-  it.each([10002, 10005, 10010, 10011])(
-    "uses the CoinGecko error code %i over the status",
-    (code) => {
-      expect(httpErrorMessage(400, code)).not.toBe(httpErrorMessage(400));
-    },
-  );
-
-  it("treats unlisted server errors as CoinGecko's fault", () => {
+  it("treats unlisted server errors as unavailability, not the user's fault", () => {
     expect(httpErrorMessage(520)).toBe(httpErrorMessage(500));
   });
 
-  it("falls back to a generic message for unknown client errors and codes", () => {
+  it("falls back to a generic message for unknown client errors", () => {
     expect(httpErrorMessage(418)).toBe(UNKNOWN_ERROR_MESSAGE);
-    expect(httpErrorMessage(418, 99999)).toBe(UNKNOWN_ERROR_MESSAGE);
+  });
+
+  it("never names the upstream provider or mentions keys", () => {
+    for (const status of [400, 401, 403, 404, 408, 429, 500, 502, 503, 504]) {
+      expect(httpErrorMessage(status)).not.toMatch(/coingecko|key/i);
+    }
   });
 });
 

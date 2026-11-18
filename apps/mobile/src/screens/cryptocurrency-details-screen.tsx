@@ -44,7 +44,7 @@ export default function CryptocurrencyDetailsScreen() {
 }
 
 function CoinDetails({ id, currency }: { id: string; currency: CurrencyCode }) {
-  const { data: coin, error, retry } = useCryptocurrencyDetails(id);
+  const { data: coin, error, retry } = useCryptocurrencyDetails(id, currency);
   if (!coin)
     return (
       <LoadState error={error} retry={retry} label="Loading coin details…" />

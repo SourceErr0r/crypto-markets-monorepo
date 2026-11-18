@@ -45,3 +45,7 @@ example
 # generated native folders
 apps/mobile/ios
 apps/mobile/android
+
+# Cloudflare Worker local secrets
+.dev.vars
+.wrangler/
