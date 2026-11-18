@@ -38,13 +38,19 @@ Responses are cached in Workers KV. The Cache API is the usual choice, but it on
 - It doesn't stop anyone else from calling it. Any value the app could send to prove it's the real app would ship in the bundle and could be copied, just like the key. CORS only restricts browsers, and `Origin` headers can be faked outside one. The data is public, so the worst case is someone using the proxy as rate-limited access to the same four endpoints.
 - It doesn't fully protect the monthly budget. Coin detail, charts and search have unbounded keys (any coin, any query), so a determined client spread across many IPs can still miss the cache. The next steps would be a global budget guard (stretch cache lifetimes or serve stale once spend passes a threshold), short caching of 404s, and restricting CORS to the web app's domain once it's deployed. Real client verification would mean App Attest and Play Integrity on mobile and Turnstile on web, which is out of scope for public market data.
 
-### A small API layer with hand-written parsers
+### Shared API client
 
-`src/api/` is split into the request function (`coingecko.ts`), response parsers (`coingecko-parsers.ts`), error mapping (`coingecko-errors.ts`) and types (`coingecko.types.ts`). Responses are parsed from `unknown` rather than cast, so malformed data produces a "couldn't read this" error instead of a crash further down the tree.
+The client, response schemas, error mapping and query hooks live in `packages/api` (`@crypto-markets/api`), so the mobile app and the planned web app use the same code to talk to the proxy.
 
-I opted to use hand-written parsers rather than a schema library such as Zod to avoid adding a dependency and extra complexity for the sake of only four endpoints.
+**No platform code in the package.** The base URL differs per platform (the Android emulator reaches the host at `10.0.2.2`, and a web app reads its own env var), so the package exports `createApiClient(baseUrl)` and each app creates its client. Hooks get the client from an `ApiClientProvider`, the same pattern as TanStack Query's `QueryClientProvider`. Tests inject a stub client or a mock server the same way. A module-level `configureApi()` would be less code, but it is hidden global state that every test would have to reset.
 
-Errors are mapped to user-safe messages by HTTP status; the proxy's error `code` is kept on the error for debugging. The copy never names the upstream provider or mentions keys. Raw messages never reach the UI.
+**Every response is validated with zod.** The original take-home used hand-written parsers to avoid a dependency for four endpoints. With a second app consuming the same types, keeping types and runtime checks in sync by hand stopped being worth it: the types are now inferred from the schemas, so they can't drift. The request helper parses against a schema, so there is no unchecked cast anywhere. The rules per field are explicit:
+
+- Identity fields (`id`, `name`, `symbol`) are required. Without them the response is rejected as invalid.
+- Display fields fall back: a missing or non-numeric price becomes `null` and the UI shows "unavailable", so one bad field doesn't hide the whole screen. Obscure coins from search often have gaps, so this is normal rather than an error.
+- Unknown fields are stripped, and a price series with any invalid point is rejected rather than drawn wrongly.
+
+**Errors carry a kind.** `ApiError` is one of `network` (no response), `http` (the proxy returned an error status) or `invalid-response` (a 2xx body that wasn't JSON or didn't match the schema). Messages are mapped to user-safe copy by status; the proxy's `code` is kept for debugging. The copy never names the upstream provider or mentions keys, and anything that isn't an `ApiError` is shown as a generic message, so raw messages never reach the UI.
 
 ### Search uses CoinGecko's `/search` endpoint
 
@@ -52,11 +58,24 @@ The dashboard only holds the top 10 coins, so searching that list wouldn't let s
 
 Input is debounced by 400ms, and a query shorter than two characters never makes a request (the proxy rejects it too: one-letter queries match almost everything and each one is a separate, uncached upstream call). This keeps the number of calls down on a rate-limited API. Results are cached per search term by React Query, so repeating a recent search is instant. Selecting a result opens the same detail screen as the dashboard.
 
-The trade-off is that search needs a network connection and spends API calls, whereas filtering a locally cached list would be instant and free. Search results can also include obscure tokens with very little data, so the parsers and the detail screen treat missing fields as normal rather than as errors. The search screen has distinct states for loading, no results, and failure with a retry.
+The trade-off is that search needs a network connection and spends API calls, whereas filtering a locally cached list would be instant and free. Search results can also include obscure tokens with very little data, so the response schemas and the detail screen treat missing fields as normal rather than as errors. The search screen has distinct states for loading, no results, and failure with a retry.
 
 ### TanStack Query for server state
 
-React Query gives caching, request de-duplication, cancellation via `AbortSignal`, and retry without adding tens of lines of hand-written code. Defaults are a 5-minute `staleTime` and a single retry, and only for errors that could be transient (network, 408, 5xx). Retrying a 429 would count against the rate limit and is unlikely to help.
+React Query gives caching, request de-duplication, cancellation via `AbortSignal`, and retry without adding tens of lines of hand-written code.
+
+**Retries are for transient failures only.** A failed query is retried once, and only for network errors, 408 and 5xx. A 4xx won't change on a second attempt, a response that failed validation will fail the same way again, and a bug in our own code shouldn't be hidden behind a retry. Every retry also counts against the rate limit.
+
+**Each query sets its own `staleTime`.** The proxy's cache lifetime is a budget decision: it caps calls to CoinGecko however many people use the app. The client's `staleTime` is a UX decision about when to check again. A refetch inside the proxy's cache lifetime is served from the proxy's cache and never reaches CoinGecko, so the client can afford to be fresher than the proxy:
+
+| Query | Client `staleTime` | Proxy cache |
+|---|---|---|
+| Top 10 markets | 2 min | 15 min |
+| Coin detail | 5 min | 10 min |
+| Search | 1 hour | 1 hour |
+| Price chart (1D / 7D, 30D) | 5 min / 30 min | 5 min / 1 hour |
+
+Reading the proxy's `Cache-Control` header to set `staleTime` would remove the duplication, but the fixed values are easier to reason about and test with four endpoints.
 
 Price-history uses `keepPreviousData`, so switching between 1D, 7D and 30D keeps the old chart visible with a status line in order to preserve the screen layout.
 
@@ -72,13 +91,15 @@ One theme object in `src/constants/theme.ts`. I looked at some examples of exist
 
 ### Testing approach
 
-Tests are for logic and data hooks rather than UI, covering request handling, error mapping, utils and parsers. Component/screen tests have been done manually.
+Tests are for logic and data hooks rather than UI, covering request handling, error mapping, schemas and utils. Component/screen tests have been done manually.
+
+The shared API package is tested at two boundaries. Client tests run against [MSW](https://mswjs.io), which intercepts `fetch` and answers like the proxy, so the code under test is exactly what ships: real requests, real `Response` objects, real parsing. Hook tests inject a stub client and focus on hook behaviour (debounce, placeholder data, reuse of fresh data). A few integration tests run hooks through the real client and MSW to check the pieces fit. A request with no matching handler fails the test, so nothing reaches the network. The handlers and fixtures are exported from `@crypto-markets/api/testing` for other apps to reuse. The package uses Vitest because MSW runs in Node without the polyfills a React Native Jest environment needs; nothing in it depends on React Native.
 
 The proxy is tested with Vitest inside the Workers runtime (`@cloudflare/vitest-plugin`), against local KV and rate-limit bindings, with CoinGecko replaced by a stub of `fetch`. The tests cover the allow-list, cache key normalisation, hits and refreshes, trimming, serving stale data on failure, error mapping and the per-IP limit. Jest stays in the mobile app because `jest-expo` is the supported setup there; the proxy needs the Workers runtime, which Jest can't provide.
 
 ### Monorepo layout
 
-The project is a pnpm workspace: the Expo app lives in `apps/mobile`, and `packages/api` will hold the API layer (client, schemas, query hooks) so a web app and the planned API proxy can share it. Logic is shared, UI is not; the web app will have its own interface.
+The project is a pnpm workspace: the Expo app lives in `apps/mobile`, the API proxy in `apps/proxy`, and `packages/api` holds the shared API layer (client, schemas, query hooks) so a web app can reuse it. Logic is shared, UI is not; the web app will have its own interface.
 
 Plain pnpm workspaces were chosen over Turborepo or Nx. With two or three packages, a task runner's caching and dependency graph don't save enough time to justify another tool to learn and configure; `pnpm -r` runs lint, typecheck and tests across every package. That would be revisited if CI times grow. Separate repositories were ruled out because shared types would then need publishing and versioning.
 
@@ -106,6 +127,8 @@ The API layer's gaps are reviewed in detail, with a prioritised fix plan, in [ap
 For this project I have attempted to keep the dependencies as light as possible, relying on core Expo or React Native components where available. Two major exceptions were made, the first being `react-native-gifted-charts`; I wanted to display the coin history as a chart, but Expo doesn't include a charting library.
 
 The second is `@tanstack/react-query`. At first, I opted not to include this as I didn't believe the scope required it. Once I got into the implementation of the details screen the cache became far more complex and I decided that it did warrant the use of React Query to reduce this complexity.
+
+Later, `zod` was added to the shared API package for response validation (see [Shared API client](#shared-api-client)), and `msw` for tests.
 
 ## AI assistance
 

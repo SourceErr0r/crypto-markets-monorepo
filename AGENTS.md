@@ -11,7 +11,8 @@ Expo / React Native app showing CoinGecko market data. Mobile-first, also runs o
 
 - Expo SDK 57, React Native 0.86 (New Architecture), React 19, TypeScript
 - Expo Router (file-based routes), TanStack Query for server state
-- Jest + jest-expo + React Native Testing Library
+- Jest + jest-expo + React Native Testing Library (app); Vitest + MSW (`packages/api`, proxy)
+- zod for response validation (`packages/api`)
 - pnpm workspaces (`pnpm-workspace.yaml`, one `pnpm-lock.yaml` at the root)
 - CoinGecko API via `apps/proxy` (Cloudflare Worker); key in `apps/proxy/.dev.vars`, never in the app
 
@@ -53,15 +54,15 @@ apps/
       app/         Expo Router routes only (_layout.tsx = navigators). No other code here.
       screens/     Screen components rendered by routes
       components/  Small presentational components
-      hooks/       TanStack Query hooks (one per data need)
-      api/         API client (talks to apps/proxy), response types, parsers, errors
       utils/       Pure helpers (formatting, chart data)
       constants/   Theme, currencies, locale
-      test/        Shared test helpers
   proxy/         Cloudflare Worker in front of CoinGecko: allow-list, KV cache, rate limit.
                  Tests run in the Workers runtime (Vitest + @cloudflare/vitest-plugin).
 packages/
-  api/           @crypto-markets/api: shared API layer (empty; client and hooks move here)
+  api/           @crypto-markets/api: shared API layer. Client (createApiClient + provider),
+                 zod schemas, ApiError, TanStack Query hooks (one per data need).
+                 Platform-free: no react-native imports. Vitest + MSW; shared handlers
+                 and fixtures in src/testing (exported as @crypto-markets/api/testing).
 docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
 ```
 
@@ -71,7 +72,8 @@ docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facin
 - Functional components and hooks. Keep components small and focused.
 - Use `FlatList` for coin lists. Handle loading, empty and error states.
 - Responsive layout over fixed dimensions. Add accessibility props on interactive elements.
-- Keep API calls out of UI components: `api/` → `hooks/` → `screens/`.
+- Keep API calls out of UI components: `@crypto-markets/api` (client → hooks) → `screens/`.
+- Validate every response with a zod schema; infer types from schemas. Retry only `ApiError`s that `isRetryable` allows.
 - Type only the API fields the app consumes. Handle network failures and unexpected response shapes.
 - Prefer Expo/RN APIs over new dependencies.
 - Test behaviour and logic with meaningful edge cases, not implementation details. Put tests next to the file (`*.test.ts[x]`).

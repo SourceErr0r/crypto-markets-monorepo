@@ -52,7 +52,7 @@ COINGECKO_API_KEY=your_coin_gecko_demo_key
 
 ## Data fetching and caching
 
-Server data is fetched with [TanStack Query](https://tanstack.com/query). It caches responses per query key for five minutes, de-duplicates in-flight requests, cancels abandoned ones and handles retries. This keeps range switching on the price chart instant without hand-written cache code. The proxy adds a second, shared cache, so many users are served by one upstream call. Response validation lives in `apps/mobile/src/api/coingecko-parsers.ts`.
+The client and data hooks live in the shared package `packages/api` (`@crypto-markets/api`). Server data is fetched with [TanStack Query](https://tanstack.com/query), which caches responses per query key, de-duplicates in-flight requests, cancels abandoned ones and handles retries. Each query sets how long its data stays fresh, from two minutes for prices to an hour for search results. The proxy adds a second, shared cache, so many users are served by one upstream call. Every response is validated with [zod](https://zod.dev) schemas in `packages/api/src/schemas.ts`.
 
 ## Project structure
 
@@ -65,13 +65,12 @@ apps/
       app/          Expo Router routes (thin re-exports of screens)
       screens/      Screen-level components
       components/   Reusable UI components
-      hooks/        Data-fetching hooks built on TanStack Query
-      api/          API requests, response parsers, error mapping and types
       utils/        Formatting and chart helpers
       constants/    Currencies, locale and theme
   proxy/          API proxy (Cloudflare Worker): allow-list, caching, rate limiting
 packages/
-  api/            Shared API layer (empty for now; the client and hooks will move here)
+  api/            Shared API layer: client, zod schemas, error mapping, TanStack Query
+                  hooks, and MSW handlers for tests (@crypto-markets/api/testing)
 ```
 
 ## Useful commands
@@ -89,4 +88,4 @@ pnpm typecheck    # Type-check every workspace package
 
 All commands run from the repository root. CI runs `pnpm lint`, `pnpm typecheck` and `pnpm test` on every pull request and push to `main` (see `.github/workflows/ci.yml`). To add a dependency to the app, run `npx expo install <package>` inside `apps/mobile`.
 
-Tests cover the API layer, hooks and formatting utilities. There are no UI tests.
+Tests cover the API layer, hooks and formatting utilities. There are no UI tests. The shared API package runs on Vitest with [MSW](https://mswjs.io) standing in for the proxy; the app uses Jest (`jest-expo`).
