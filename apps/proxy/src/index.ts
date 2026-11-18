@@ -4,9 +4,10 @@ import { matchRoute } from "./routes";
 import { trimToCurrency } from "./trim";
 import { fetchUpstream } from "./upstream";
 
-// Must match `ratelimits[0].simple.period` in wrangler.jsonc. The binding
-// doesn't say when the window resets, so a full period is the safe wait.
-const RATE_LIMIT_PERIOD_SECONDS = 60;
+// Retry-After for clients over the per-IP limit. The binding doesn't say when
+// its window resets, so wait the longest period it supports (10 or 60 s):
+// always long enough, whatever wrangler.jsonc sets.
+const RATE_LIMITED_RETRY_AFTER_SECONDS = 60;
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -23,7 +24,7 @@ export default {
         status: 429,
         code: "rate_limited",
         message: "Too many requests. Please wait a moment and try again.",
-        retryAfterSeconds: RATE_LIMIT_PERIOD_SECONDS,
+        retryAfterSeconds: RATE_LIMITED_RETRY_AFTER_SECONDS,
       });
     }
 
