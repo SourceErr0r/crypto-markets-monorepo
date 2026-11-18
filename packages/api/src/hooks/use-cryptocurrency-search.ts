@@ -1,11 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { MIN_SEARCH_LENGTH, searchCryptocurrencies } from "@/api/coingecko";
-import { getErrorMessage } from "@/api/coingecko-errors";
+import { MIN_SEARCH_LENGTH } from "../client";
+import { useApiClient } from "../client-context";
+import { getErrorMessage } from "../errors";
 
 // The API is rate limited, so wait for typing to pause.
 const DEBOUNCE_MS = 400;
+// Search results are coin names and ranks, which barely change. Matches the
+// proxy's 1-hour cache.
+const STALE_TIME_MS = 60 * 60 * 1000;
 
 export function useCryptocurrencySearch(query: string) {
   const term = query.trim();
@@ -16,10 +20,12 @@ export function useCryptocurrencySearch(query: string) {
     return () => clearTimeout(timeout);
   }, [term]);
 
+  const api = useApiClient();
   const { data, error, isFetching, refetch } = useQuery({
     queryKey: ["cryptocurrency-search", debouncedTerm],
-    queryFn: ({ signal }) => searchCryptocurrencies(debouncedTerm, signal),
+    queryFn: ({ signal }) => api.searchCryptocurrencies(debouncedTerm, signal),
     enabled: debouncedTerm.length >= MIN_SEARCH_LENGTH,
+    staleTime: STALE_TIME_MS,
   });
 
   // Shorter terms are treated as no search yet, so the screen keeps its hint.

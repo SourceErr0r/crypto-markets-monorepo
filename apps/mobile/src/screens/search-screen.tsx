@@ -10,13 +10,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  useCryptocurrencySearch,
+  type CryptocurrencySearchResult,
+} from "@crypto-markets/api";
 
-import type { CryptocurrencySearchResult } from "@/api/coingecko";
 import { SearchResultRow } from "@/components/search-result-row";
 import { StateMessage } from "@/components/state-message";
 import { currencyCodes } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
-import { useCryptocurrencySearch } from "@/hooks/use-cryptocurrency-search";
 
 export default function SearchScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();

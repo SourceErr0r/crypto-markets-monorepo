@@ -1,4 +1,3 @@
-import type { CryptocurrencyDetails } from "@/api/coingecko";
 import {
   DetailSection,
   MutedText,
@@ -14,6 +13,7 @@ import {
   rangePercentage,
 } from "@/utils/coin-details";
 import { formatDecimal, formatPrice } from "@/utils/formatters";
+import type { CryptocurrencyDetails } from "@crypto-markets/api";
 
 type SectionProps = { coin: CryptocurrencyDetails; currency: CurrencyCode };
 

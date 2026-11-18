@@ -1,13 +1,14 @@
-import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
-import { CoinGeckoError } from "@/api/coingecko-errors";
-import { getCryptocurrencyPriceHistory } from "@/api/coingecko";
-import type { HistoryDays, PriceHistoryPoint } from "@/api/coingecko.types";
-import { usePriceHistory } from "@/hooks/use-price-history";
-import { createQueryWrapper } from "@/test/query-wrapper";
+import { ApiError } from "../errors";
+import type { HistoryDays, PriceHistoryPoint } from "../types";
+import { usePriceHistory } from "./use-price-history";
+import { createApiClient, type ApiClient } from "../client";
+import { createWrapper } from "./test-wrapper";
 
-jest.mock("@/api/coingecko");
-const getHistory = jest.mocked(getCryptocurrencyPriceHistory);
+const getHistory = vi.fn<ApiClient["getCryptocurrencyPriceHistory"]>();
+const api = { ...createApiClient("https://api.test"), getCryptocurrencyPriceHistory: getHistory };
 
 const points: PriceHistoryPoint[] = [
   [1000, 10],
@@ -17,12 +18,14 @@ const points: PriceHistoryPoint[] = [
 function renderHistory() {
   return renderHook(
     ({ days }: { days: HistoryDays }) => usePriceHistory("bitcoin", "gbp", days),
-    { wrapper: createQueryWrapper(), initialProps: { days: 7 } },
+    { wrapper: createWrapper(api), initialProps: { days: 7 } },
   );
 }
 
 describe("usePriceHistory", () => {
-  beforeEach(() => getHistory.mockReset());
+  beforeEach(() => {
+    getHistory.mockReset();
+  });
 
   it("returns the chart for the selected range", async () => {
     getHistory.mockResolvedValue(points);
@@ -81,7 +84,7 @@ describe("usePriceHistory", () => {
   });
 
   it("reports the error message and recovers on retry", async () => {
-    getHistory.mockRejectedValueOnce(new CoinGeckoError("Rate limited"));
+    getHistory.mockRejectedValueOnce(new ApiError("Rate limited", { kind: "http", status: 429 }));
     const { result } = renderHistory();
 
     await waitFor(() => expect(result.current.error).toBe("Rate limited"));

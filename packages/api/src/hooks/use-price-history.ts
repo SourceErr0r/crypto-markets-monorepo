@@ -1,15 +1,25 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { getCryptocurrencyPriceHistory } from "@/api/coingecko";
-import { getErrorMessage } from "@/api/coingecko-errors";
-import type { HistoryDays, PriceHistoryPoint } from "@/api/coingecko.types";
-import type { CurrencyCode } from "@/constants/currencies";
+import { useApiClient } from "../client-context";
+import { getErrorMessage } from "../errors";
+import type { HistoryDays, PriceHistoryPoint } from "../types";
+import type { CurrencyCode } from "../currencies";
+
+const MINUTE_MS = 60 * 1000;
+// Follows the data's granularity, like the proxy's cache: CoinGecko returns
+// 5-minute points for 1 day and hourly points for 7 and 30 days.
+const STALE_TIME_MS: Record<HistoryDays, number> = {
+  1: 5 * MINUTE_MS,
+  7: 30 * MINUTE_MS,
+  30: 30 * MINUTE_MS,
+};
 
 export function usePriceHistory(
   id: string,
   currency: CurrencyCode,
   days: HistoryDays,
 ) {
+  const api = useApiClient();
   const { data, error, isPending, isPlaceholderData, refetch } = useQuery({
     queryKey: ["price-history", id, currency, days],
     // Return the range with the points so a placeholder chart can say which
@@ -19,8 +29,9 @@ export function usePriceHistory(
       points: PriceHistoryPoint[];
     }> => ({
       days,
-      points: await getCryptocurrencyPriceHistory(id, currency, days, signal),
+      points: await api.getCryptocurrencyPriceHistory(id, currency, days, signal),
     }),
+    staleTime: STALE_TIME_MS[days],
     placeholderData: keepPreviousData,
   });
 

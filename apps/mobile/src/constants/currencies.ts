@@ -1,4 +1,9 @@
-// Hardcoded for simplicity, but could use `/supported_vs_currencies` to get full list
+import { CURRENCY_CODES, type CurrencyCode } from "@crypto-markets/api";
+
+export type { CurrencyCode };
+
+// Display details for each currency the API accepts. Hardcoded for
+// simplicity, but could use `/supported_vs_currencies` to get the full list.
 export const currencies = {
   gbp: {
     code: "GBP",
@@ -15,8 +20,9 @@ export const currencies = {
     label: "Euro",
     symbol: "€",
   },
-} as const;
+} as const satisfies Record<
+  CurrencyCode,
+  { code: string; label: string; symbol: string }
+>;
 
-export type CurrencyCode = keyof typeof currencies;
-
-export const currencyCodes = Object.keys(currencies) as CurrencyCode[];
+export const currencyCodes: readonly CurrencyCode[] = CURRENCY_CODES;

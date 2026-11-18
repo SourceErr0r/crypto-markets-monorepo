@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@crypto-markets/api": "workspace:*",
     "@expo/metro-runtime": "~57.0.18",
     "@tanstack/react-query": "~5.104.1",
     "expo": "~57.0.33",

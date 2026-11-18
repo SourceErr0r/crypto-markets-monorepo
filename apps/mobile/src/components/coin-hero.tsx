@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from "react-native";
+import type { CryptocurrencyDetails } from "@crypto-markets/api";
 
-import type { CryptocurrencyDetails } from "@/api/coingecko";
 import { ChangeBadge, MutedText, Row } from "@/components/coin-details-ui";
 import { currencies, type CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";

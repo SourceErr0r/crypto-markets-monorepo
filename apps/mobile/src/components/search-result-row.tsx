@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import type { CryptocurrencySearchResult } from "@crypto-markets/api";
 
-import type { CryptocurrencySearchResult } from "@/api/coingecko";
 import { theme } from "@/constants/theme";
 
 type SearchResultRowProps = {

@@ -29,19 +29,31 @@ export type ApiErrorResponse = {
   error?: { code?: string; message?: string };
 };
 
-type ErrorDetails = { status?: number; code?: string; cause?: unknown };
+// What went wrong, so callers can decide what to do without parsing messages:
+// - network: no response at all (offline, DNS, connection reset)
+// - http: the proxy answered with an error status
+// - invalid-response: a 2xx whose body wasn't JSON or didn't match the schema
+export type ApiErrorKind = "network" | "http" | "invalid-response";
 
-// Carries a user-friendly message. The raw status and code stay available for
-// debugging without being shown in the UI.
-export class CoinGeckoError extends Error {
+type ErrorDetails =
+  | { kind: "network" | "invalid-response"; cause?: unknown }
+  | { kind: "http"; status: number; code?: string };
+
+// Carries a user-friendly message. The kind, status and code stay available
+// for retry decisions and debugging without being shown in the UI.
+export class ApiError extends Error {
+  readonly kind: ApiErrorKind;
   readonly status?: number;
   readonly code?: string;
 
-  constructor(message: string, { status, code, cause }: ErrorDetails = {}) {
-    super(message, { cause });
-    this.name = "CoinGeckoError";
-    this.status = status;
-    this.code = code;
+  constructor(message: string, details: ErrorDetails) {
+    super(message, { cause: "cause" in details ? details.cause : undefined });
+    this.name = "ApiError";
+    this.kind = details.kind;
+    if (details.kind === "http") {
+      this.status = details.status;
+      this.code = details.code;
+    }
   }
 }
 
@@ -53,23 +65,22 @@ export function httpErrorMessage(status: number) {
   );
 }
 
-// Only failures that could be transient are worth retrying. Client errors such
-// as 429 or 404 won't change on a second attempt, and failed calls still count
-// toward the rate limit.
+// Only failures that could be transient are worth retrying: no response, a
+// timeout, or a server error. Client errors such as 429 or 404 won't change on
+// a second attempt, and failed calls still count toward the rate limit. A body
+// that fails validation, or a bug in our own code, will fail the same way again.
 export function isRetryable(error: unknown) {
-  if (!(error instanceof CoinGeckoError) || error.status === undefined) {
-    return true;
+  if (!(error instanceof ApiError)) return false;
+  if (error.kind === "network") return true;
+  if (error.kind === "http") {
+    return error.status === 408 || (error.status ?? 0) >= 500;
   }
-  return error.status === 408 || error.status >= 500;
-}
-
-export function invalidResponseError() {
-  return new CoinGeckoError(INVALID_RESPONSE_MESSAGE);
+  return false;
 }
 
 // The only way errors should reach the UI: raw messages never leak through.
 export function getErrorMessage(error: unknown) {
-  return error instanceof CoinGeckoError
+  return error instanceof ApiError
     ? error.message
     : UNKNOWN_ERROR_MESSAGE;
 }

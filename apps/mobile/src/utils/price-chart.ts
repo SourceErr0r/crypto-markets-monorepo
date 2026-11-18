@@ -1,6 +1,6 @@
-import type { HistoryDays, PriceHistoryPoint } from "@/api/coingecko.types";
 import { currencies, type CurrencyCode } from "@/constants/currencies";
 import { LOCALE } from "@/constants/locale";
+import type { HistoryDays, PriceHistoryPoint } from "@crypto-markets/api";
 
 import { compactZeros, formatNumber } from "@/utils/formatters";
 
