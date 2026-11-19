@@ -59,6 +59,7 @@ describe("getTopCryptocurrencies", () => {
       current_price: 65000,
       total_volume: 30000000000,
       market_cap: 1280000000000,
+      last_updated: "2026-11-18T12:00:30.000Z",
     });
   });
 
@@ -77,6 +78,7 @@ describe("getTopCryptocurrencies", () => {
         current_price: null,
         total_volume: null,
         market_cap: null,
+        last_updated: null,
       },
     ]);
   });

@@ -10,7 +10,11 @@ import type { Cryptocurrency } from "../types";
 const getTop = vi.fn<ApiClient["getTopCryptocurrencies"]>();
 const api = { ...createApiClient("https://api.test"), getTopCryptocurrencies: getTop };
 
-const bitcoin = { id: "bitcoin", name: "Bitcoin" } as Cryptocurrency;
+const bitcoin = {
+  id: "bitcoin",
+  name: "Bitcoin",
+  last_updated: "2026-11-18T12:00:00.000Z",
+} as Cryptocurrency;
 
 describe("useCryptocurrencies", () => {
   beforeEach(() => {
@@ -47,13 +51,26 @@ describe("useCryptocurrencies", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("dates the data by when CoinGecko last updated it, not when we fetched it", async () => {
+    getTop.mockResolvedValue([
+      bitcoin,
+      { ...bitcoin, id: "ethereum", last_updated: "2026-11-18T12:00:30.000Z" },
+      { ...bitcoin, id: "unknown", last_updated: null },
+    ]);
+    const { result } = renderHook(() => useCryptocurrencies("usd"), {
+      wrapper: createWrapper(api),
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.updatedAt).toBe(Date.parse("2026-11-18T12:00:30.000Z"));
+  });
+
   it("keeps showing cached data when a refresh fails, and says when it failed", async () => {
     getTop.mockResolvedValueOnce([bitcoin]);
     const { result } = renderHook(() => useCryptocurrencies("usd"), {
       wrapper: createWrapper(api),
     });
-    await waitFor(() => expect(result.current.updatedAt).not.toBeNull());
-    const loadedAt = result.current.updatedAt;
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.errorUpdatedAt).toBe(0);
 
     getTop.mockRejectedValueOnce(new ApiError("offline", { kind: "network" }));
@@ -61,7 +78,7 @@ describe("useCryptocurrencies", () => {
 
     await waitFor(() => expect(result.current.error?.kind).toBe("offline"));
     expect(result.current.cryptocurrencies).toEqual([bitcoin]);
-    expect(result.current.updatedAt).toBe(loadedAt);
+    expect(result.current.updatedAt).toBe(Date.parse("2026-11-18T12:00:00.000Z"));
     expect(result.current.errorUpdatedAt).toBeGreaterThan(0);
   });
 
