@@ -1,7 +1,8 @@
 import {
   ApiClientProvider,
   createApiClient,
-  isRetryable,
+  retryDelay,
+  shouldRetry,
 } from "@crypto-markets/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
@@ -21,12 +22,14 @@ const apiClient = createApiClient(
 );
 
 // Each query in @crypto-markets/api sets its own staleTime; this is the
-// fallback for any query that doesn't.
+// fallback for any query that doesn't. The retry policy lives in the API
+// package so every app backs off the same way.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
-      retry: (failureCount, error) => failureCount < 1 && isRetryable(error),
+      retry: shouldRetry,
+      retryDelay,
     },
   },
 });

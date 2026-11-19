@@ -8,6 +8,7 @@ export {
   isRetryable,
   type ApiErrorKind,
 } from "./errors";
+export { retryDelay, shouldRetry } from "./retry";
 export type {
   Cryptocurrency,
   CryptocurrencyDetails,

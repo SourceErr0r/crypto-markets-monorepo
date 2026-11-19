@@ -5,6 +5,7 @@ import {
   getErrorMessage,
   httpErrorMessage,
   isRetryable,
+  parseRetryAfter,
   UNKNOWN_ERROR_MESSAGE,
 } from "./errors";
 
@@ -61,6 +62,10 @@ describe("isRetryable", () => {
     expect(isRetryable(new ApiError("offline", { kind: "network" }))).toBe(true);
   });
 
+  it("retries timeouts", () => {
+    expect(isRetryable(new ApiError("slow", { kind: "timeout" }))).toBe(true);
+  });
+
   it("does not retry a response that failed validation", () => {
     expect(isRetryable(new ApiError("bad", { kind: "invalid-response" }))).toBe(
       false,
@@ -70,4 +75,18 @@ describe("isRetryable", () => {
   it("does not retry errors from our own code", () => {
     expect(isRetryable(new TypeError("x is not a function"))).toBe(false);
   });
+});
+
+describe("parseRetryAfter", () => {
+  it("reads a number of seconds", () => {
+    expect(parseRetryAfter("60")).toBe(60);
+    expect(parseRetryAfter(" 0 ")).toBe(0);
+  });
+
+  it.each([null, "", "soon", "-5", "1.5", "Wed, 21 Oct 2026 07:28:00 GMT"])(
+    "ignores %j rather than guessing",
+    (header) => {
+      expect(parseRetryAfter(header)).toBeUndefined();
+    },
+  );
 });
