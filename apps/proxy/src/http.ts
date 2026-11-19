@@ -36,16 +36,17 @@ export type CacheStatus = "HIT" | "MISS" | "STALE";
 
 export function dataResponse(
   body: string,
-  { ageSeconds, ttlSeconds, cacheStatus }: { ageSeconds: number; ttlSeconds: number; cacheStatus: CacheStatus },
+  { ageSeconds, cacheStatus }: { ageSeconds: number; cacheStatus: CacheStatus },
 ): Response {
-  // A stale copy is served because the upstream failed, so clients shouldn't
-  // hold on to it.
-  const maxAge = cacheStatus === "STALE" ? 0 : Math.max(ttlSeconds - ageSeconds, 0);
   return new Response(body, {
     headers: {
       ...CORS_HEADERS,
       "Content-Type": "application/json",
-      "Cache-Control": `public, max-age=${maxAge}`,
+      // Clients may store a copy but must ask us before reusing it. With
+      // max-age, the device's HTTP cache answered refreshes itself, so
+      // pull-to-refresh did nothing and failures never surfaced. Asking us is
+      // cheap: we answer from KV without calling CoinGecko.
+      "Cache-Control": "no-cache",
       // How old the data is, so the app can show "updated 4 min ago".
       Age: String(ageSeconds),
       // For debugging and tests: was this served from the cache?

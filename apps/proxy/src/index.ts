@@ -37,20 +37,20 @@ export default {
 
     const cached = await readCache(env.CACHE, upstreamPath);
     if (cached && cached.ageSeconds < ttlSeconds) {
-      return dataResponse(shape(cached.body), { ageSeconds: cached.ageSeconds, ttlSeconds, cacheStatus: "HIT" });
+      return dataResponse(shape(cached.body), { ageSeconds: cached.ageSeconds, cacheStatus: "HIT" });
     }
 
     const upstream = await fetchUpstream(upstreamPath, env.COINGECKO_API_KEY);
     if (upstream.ok) {
       // Written after the response is sent, so the client doesn't wait on KV.
       ctx.waitUntil(writeCache(env.CACHE, upstreamPath, upstream.body));
-      return dataResponse(shape(upstream.body), { ageSeconds: 0, ttlSeconds, cacheStatus: "MISS" });
+      return dataResponse(shape(upstream.body), { ageSeconds: 0, cacheStatus: "MISS" });
     }
 
     // Upstream failed: an old copy is better than an error (stale-if-error).
     // A 404 is a real answer, not a failure, so it isn't masked.
     if (cached && upstream.error.status !== 404) {
-      return dataResponse(shape(cached.body), { ageSeconds: cached.ageSeconds, ttlSeconds, cacheStatus: "STALE" });
+      return dataResponse(shape(cached.body), { ageSeconds: cached.ageSeconds, cacheStatus: "STALE" });
     }
 
     return errorResponse(upstream.error);
