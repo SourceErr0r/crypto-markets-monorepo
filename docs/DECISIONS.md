@@ -50,7 +50,13 @@ The client, response schemas, error mapping and query hooks live in `packages/ap
 - Display fields fall back: a missing or non-numeric price becomes `null` and the UI shows "unavailable", so one bad field doesn't hide the whole screen. Obscure coins from search often have gaps, so this is normal rather than an error.
 - Unknown fields are stripped, and a price series with any invalid point is rejected rather than drawn wrongly.
 
-**Errors carry a kind.** `ApiError` is one of `network` (no response), `http` (the proxy returned an error status) or `invalid-response` (a 2xx body that wasn't JSON or didn't match the schema). Messages are mapped to user-safe copy by status; the proxy's `code` is kept for debugging. The copy never names the upstream provider or mentions keys, and anything that isn't an `ApiError` is shown as a generic message, so raw messages never reach the UI.
+**Errors carry a kind.** `ApiError` is one of `network` (no response), `timeout` (no complete response within 10 seconds), `http` (the proxy returned an error status) or `invalid-response` (a 2xx body that wasn't JSON or didn't match the schema). Messages are mapped to user-safe copy by status; the proxy's `code` is kept for debugging. The copy never names the upstream provider or mentions keys, and anything that isn't an `ApiError` is shown as a generic message, so raw messages never reach the UI.
+
+**Screens get a display error, not an `ApiError`.** Hooks return `{ kind, message, retryAfterSeconds }`, where the kind is in the UI's terms (`offline`, `timeout`, `rate-limited`, `not-found`, `unavailable`, `unknown`) rather than HTTP's. Screens pick copy such as "Can't connect" or "try again in 1 min" without knowing status codes, and the web app will get the same model. Hooks also return when the last failure happened, so a screen can react once to each failure even when the message repeats.
+
+**A failed refresh never hides data.** If there is nothing on screen, the error fills it, with a retry button. If data is already showing, it stays, and a short toast says the refresh failed and how old the prices are ("Couldn't refresh · prices updated 12 min ago"). The toast is built with React Native's `Animated` rather than a library, and is announced to screen readers (VoiceOver through `announceForAccessibility`, Android and web through a live region).
+
+**Requests time out after 10 seconds.** Without a limit, a hung connection kept a spinner running until the user left the screen. The limit covers the whole exchange, body included. It is combined with TanStack Query's own abort signal by hand rather than with `AbortSignal.any` and `AbortSignal.timeout`, which not every JavaScript engine the app runs on provides.
 
 ### Search uses CoinGecko's `/search` endpoint
 
@@ -64,13 +70,18 @@ The trade-off is that search needs a network connection and spends API calls, wh
 
 React Query gives caching, request de-duplication, cancellation via `AbortSignal`, and retry without adding tens of lines of hand-written code.
 
-**Retries are for transient failures only.** A failed query is retried once, and only for network errors, 408 and 5xx. A 4xx won't change on a second attempt, a response that failed validation will fail the same way again, and a bug in our own code shouldn't be hidden behind a retry. Every retry also counts against the rate limit.
+**Retries are for transient failures only, with backoff.** The policy lives in `packages/api` (`shouldRetry`, `retryDelay`) so every app backs off the same way.
+
+- Network errors, timeouts, 408 and 5xx are retried twice. The waits grow exponentially (about 1 second, then 2, capped at 8), with random jitter so clients that failed together don't all retry at the same moment.
+- A 4xx won't change on a second attempt, a response that failed validation will fail the same way again, and a bug in our own code shouldn't be hidden behind a retry. Every retry also counts against the rate limit.
+- When the server sends `Retry-After` (the proxy's own 429, or a 503 when CoinGecko is rate-limiting it), that overrides the rules above. A wait of up to 10 seconds is waited out once, silently. A longer one, such as the proxy's 60-second per-IP limit, is shown straight away as "try again in 1 min" rather than leaving a spinner running for a minute.
 
 **Each query sets its own `staleTime`.** The proxy's cache lifetime is a budget decision: it caps calls to CoinGecko however many people use the app. The client's `staleTime` is a UX decision about when to check again. A refetch inside the proxy's cache lifetime is served from the proxy's cache and never reaches CoinGecko, so the client can afford to be fresher than the proxy:
 
 | Query | Client `staleTime` | Proxy cache |
 |---|---|---|
 | Top 10 markets | 2 min | 15 min |
+| All markets (per page) | 2 min | 15 min |
 | Coin detail | 5 min | 10 min |
 | Search | 1 hour | 1 hour |
 | Price chart (1D / 7D, 30D) | 5 min / 30 min | 5 min / 1 hour |
@@ -80,6 +91,16 @@ Reading the proxy's `Cache-Control` header to set `staleTime` would remove the d
 **Devices revalidate with the proxy instead of caching on their own.** The proxy sends `Cache-Control: no-cache`, so the platform HTTP cache (`NSURLCache` on iOS, OkHttp on Android, the browser cache on web) must ask the proxy before reusing a response. An earlier `max-age` equal to the proxy's remaining cache lifetime let the device answer refreshes itself: pull-to-refresh did nothing and failures never reached the app. Revalidating costs one Worker request answered from KV, not a CoinGecko call. That leaves two caches with clear owners: the proxy's protects the upstream budget, and the query cache decides what the user sees.
 
 **"Updated 12 min ago" comes from CoinGecko's `last_updated`, not the fetch time.** The time a response arrived says nothing about how old the prices are once caches sit in between. CoinGecko's own timestamp passes through every layer unchanged, so the dashboard shows the age of the newest `last_updated` among its coins. A relative age suits a list that only gets new prices every 15 minutes: after a pull-to-refresh that brings nothing new, "12 min ago" is still true, where a clock time would look like the refresh had failed.
+
+### All markets: offset pages, deduplicated and capped
+
+The dashboard stays a fixed top 10 (the core requirement). A separate "All markets" screen, linked from "See all", scrolls through the top 500 with `useInfiniteQuery`: pages of 100, loaded as the user nears the end of the list.
+
+**Offset pages, because that's what CoinGecko offers.** `/coins/markets` takes `page` and `per_page`, and the ranking can change between two page fetches. A coin that drops a place after page 1 has loaded shows up again at the top of page 2. A coin that climbs across the boundary is skipped. The hook removes duplicates by `id` and keeps the first, higher-ranked appearance. A skipped coin is accepted: the next refresh brings it back, and search finds any coin directly. Cursor pagination (for example "coins below market cap X") would avoid both problems, and is what I'd use in an API I owned.
+
+**Page size and cap are budget decisions.** Each page is its own proxy cache entry per currency, so the worst case is 5 pages × 3 currencies upstream calls per 15 minutes, and only for pages someone actually scrolls to. 100 per page shows the first screen sooner than 250 for a little more of that budget. The cap at five pages stops a long scroll from spending calls on coins few people look for. The end of the list says so and points to search.
+
+**States.** A failed first load fills the screen, and a failed refresh shows the toast, as on the dashboard. A failed next page shows only at the end of the list, with a retry button, and the pages already loaded stay. While that error is showing, scrolling doesn't request the page again; only the button does, so a rate-limited user doesn't keep spending their limit. Pull-to-refresh refetches every loaded page in order, which keeps the list and scroll position in place. Each refetched page is normally a cache hit at the proxy.
 
 Price-history uses `keepPreviousData`, so switching between 1D, 7D and 30D keeps the old chart visible with a status line in order to preserve the screen layout.
 
@@ -121,7 +142,9 @@ It is one job rather than one per check. Installing dependencies is most of the 
 - Deploy the proxy from CI, and add the global budget guard described under [API proxy](#api-proxy).
 - Persist the selected currency and share it through context rather than route params.
 - Fold the detail screen's inline `LoadState` into the shared `StateMessage` (they are visually different, so left separate for now).
-- Pull-to-refresh exists on the dashboard only; the detail screen refreshes on retry after an error.
+- Pull-to-refresh exists on the dashboard and All markets only; the detail screen refreshes on retry after an error.
+- Queries don't refetch when the app returns to the foreground or reconnects (TanStack's `focusManager` and `onlineManager` need wiring on React Native). Once they do, offline queries pause rather than fail, and the toast will need to cover that case.
+- The search screen hides its cached results when a search fails, and a failed price-chart refresh shows no message.
 - The query cache currently lasts only for the session, so the app shows nothing on a cold start without a connection.
 
 The API layer's gaps are reviewed in detail, with a prioritised fix plan, in [api-audit.md](api-audit.md).
