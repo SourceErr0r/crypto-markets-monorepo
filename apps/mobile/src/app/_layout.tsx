@@ -61,6 +61,14 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="markets"
+            options={{
+              title: "All markets",
+              animation: "slide_from_right",
+              headerBackButtonDisplayMode: "minimal",
+            }}
+          />
+          <Stack.Screen
             name="search"
             options={{
               headerShown: false,

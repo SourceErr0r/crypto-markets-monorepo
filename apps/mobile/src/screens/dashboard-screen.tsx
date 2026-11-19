@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -39,6 +39,10 @@ export default function DashboardScreen() {
     });
   };
 
+  const handleSeeAllPress = () => {
+    router.push({ pathname: "/markets", params: { currency } });
+  };
+
   const handleSearchPress = () => {
     router.push({ pathname: "/search", params: { currency } });
   };
@@ -72,7 +76,21 @@ export default function DashboardScreen() {
         <Text style={styles.subtitle}>
           Top cryptocurrencies by market capitalisation.
         </Text>
-        <Text style={styles.listLabel}>TOP 10 BY MARKET CAP</Text>
+        <View style={styles.listLabelRow}>
+          <Text style={styles.listLabel}>TOP 10 BY MARKET CAP</Text>
+          <Pressable
+            accessibilityLabel="See all markets"
+            accessibilityRole="link"
+            hitSlop={12}
+            onPress={handleSeeAllPress}
+          >
+            {({ pressed }) => (
+              <Text style={[styles.seeAll, pressed && styles.seeAllPressed]}>
+                See all
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
       <FlatList
         contentContainerStyle={[
@@ -165,11 +183,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
+  listLabelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 24,
+  },
   listLabel: {
     color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
-    marginTop: 24,
+  },
+  seeAll: {
+    color: theme.colors.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  seeAllPressed: {
+    opacity: 0.6,
   },
 });
