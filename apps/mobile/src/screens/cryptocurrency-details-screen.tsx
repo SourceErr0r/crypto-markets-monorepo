@@ -18,8 +18,10 @@ import {
   currencyCodes,
   type CurrencyCode,
 } from "@/constants/currencies";
+import { Toast } from "@/components/toast";
 import { theme } from "@/constants/theme";
 import { formatDate } from "@/utils/coin-details";
+import { refreshErrorMessage } from "@/utils/error-copy";
 
 export default function CryptocurrencyDetailsScreen() {
   const params = useLocalSearchParams<{
@@ -44,26 +46,35 @@ export default function CryptocurrencyDetailsScreen() {
 }
 
 function CoinDetails({ id, currency }: { id: string; currency: CurrencyCode }) {
-  const { data: coin, error, retry } = useCryptocurrencyDetails(id, currency);
+  const { data: coin, error, errorUpdatedAt, retry, updatedAt } =
+    useCryptocurrencyDetails(id, currency);
   if (!coin)
     return (
       <LoadState error={error} retry={retry} label="Loading coin details…" />
     );
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <CoinHero coin={coin} currency={currency} />
-      <CoinPriceHistory id={id} currency={currency} />
-      <MarketOverview coin={coin} currency={currency} />
-      <DayRange coin={coin} currency={currency} />
-      <Supply coin={coin} />
-      <AllTimePrices coin={coin} currency={currency} />
-      <CoinAbout coin={coin} />
-      <Text style={styles.footer}>
-        Data from CoinGecko · {currencies[currency].code}
-        {coin.last_updated ? `\nUpdated ${formatDate(coin.last_updated)}` : ""}
-      </Text>
-    </ScrollView>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
+        <CoinHero coin={coin} currency={currency} />
+        <CoinPriceHistory id={id} currency={currency} />
+        <MarketOverview coin={coin} currency={currency} />
+        <DayRange coin={coin} currency={currency} />
+        <Supply coin={coin} />
+        <AllTimePrices coin={coin} currency={currency} />
+        <CoinAbout coin={coin} />
+        <Text style={styles.footer}>
+          Data from CoinGecko · {currencies[currency].code}
+          {coin.last_updated ? `\nUpdated ${formatDate(coin.last_updated)}` : ""}
+        </Text>
+      </ScrollView>
+      {error && (
+        <Toast
+          key={errorUpdatedAt}
+          message={refreshErrorMessage(error, updatedAt)}
+        />
+      )}
+    </>
   );
 }
 

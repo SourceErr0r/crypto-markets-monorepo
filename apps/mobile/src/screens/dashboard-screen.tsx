@@ -11,14 +11,24 @@ import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
 import { SearchButton } from "@/components/search-button";
 import { StateMessage } from "@/components/state-message";
+import { Toast } from "@/components/toast";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
+import { refreshErrorMessage } from "@/utils/error-copy";
+import { formatTime } from "@/utils/formatters";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [currency, setCurrency] = useState<CurrencyCode>("gbp");
-  const { cryptocurrencies, error, isLoading, isRefreshing, refresh } =
-    useCryptocurrencies(currency);
+  const {
+    cryptocurrencies,
+    error,
+    errorUpdatedAt,
+    isLoading,
+    isRefreshing,
+    refresh,
+    updatedAt,
+  } = useCryptocurrencies(currency);
 
   const handleCryptocurrencyPress = (id: string) => {
     const coin = cryptocurrencies.find((item) => item.id === id);
@@ -73,6 +83,13 @@ export default function DashboardScreen() {
         data={cryptocurrencies}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={emptyState}
+        ListFooterComponent={
+          updatedAt === null ? null : (
+            <Text style={styles.updatedAt}>
+              Updated {formatTime(updatedAt)} · Pull down to refresh
+            </Text>
+          )
+        }
         onRefresh={refresh}
         refreshing={isRefreshing}
         renderItem={({ item }) => (
@@ -85,6 +102,13 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       />
+      {/* With nothing to show, the error fills the list instead (emptyState). */}
+      {error && cryptocurrencies.length > 0 && (
+        <Toast
+          key={errorUpdatedAt}
+          message={refreshErrorMessage(error, updatedAt)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -136,6 +160,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
+  },
+  updatedAt: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 16,
+    textAlign: "center",
   },
   listLabel: {
     color: theme.colors.textSecondary,

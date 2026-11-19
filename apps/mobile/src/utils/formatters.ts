@@ -78,3 +78,11 @@ export function formatMarketCap(
     maximumFractionDigits: 2,
   })}${suffix}`;
 }
+
+// "14:05" for "showing prices from 14:05". Device time zone, fixed locale.
+export function formatTime(timestamp: number) {
+  return new Intl.DateTimeFormat(LOCALE, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp);
+}
