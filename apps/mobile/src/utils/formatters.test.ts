@@ -1,4 +1,4 @@
-import { formatDecimal, formatNumber, formatMarketCap, formatPrice } from '@/utils/formatters';
+import { formatAge, formatDecimal, formatNumber, formatMarketCap, formatPrice } from '@/utils/formatters';
 
 describe('formatPrice', () => {
   it('formats a small price with four decimal places', () => {
@@ -81,4 +81,32 @@ it('honours explicit precision consistently across decimal and currency formatti
   expect(formatNumber(1.000001, { maximumFractionDigits: 6 })).toBe('1.000001');
   expect(formatNumber(12.6, { maximumFractionDigits: 0 })).toBe('13');
   expect(formatPrice(88336, 'usd')).toBe(formatNumber(88336, { style: 'currency', currency: 'USD' }));
+});
+
+describe('formatAge', () => {
+  const updatedAt = Date.parse('2026-11-18T12:00:00Z');
+  const after = (ms: number) => formatAge(updatedAt, updatedAt + ms);
+  const SECOND = 1000;
+  const MINUTE = 60 * SECOND;
+  const HOUR = 60 * MINUTE;
+
+  it('calls anything under a minute "just now"', () => {
+    expect(after(0)).toBe('just now');
+    expect(after(59 * SECOND)).toBe('just now');
+  });
+
+  it('counts whole minutes, then whole hours, rounding down', () => {
+    expect(after(MINUTE)).toBe('1 min ago');
+    expect(after(59 * MINUTE + 59 * SECOND)).toBe('59 min ago');
+    expect(after(HOUR)).toBe('1 h ago');
+    expect(after(23 * HOUR + 59 * MINUTE)).toBe('23 h ago');
+  });
+
+  it('gives the date once the data is a day old', () => {
+    expect(after(24 * HOUR)).toBe('on 18 Nov');
+  });
+
+  it('treats a device clock behind the server as "just now"', () => {
+    expect(after(-5 * MINUTE)).toBe('just now');
+  });
 });

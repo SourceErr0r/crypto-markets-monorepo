@@ -12,10 +12,10 @@ import { CurrencyMenu } from "@/components/currency-menu";
 import { SearchButton } from "@/components/search-button";
 import { StateMessage } from "@/components/state-message";
 import { Toast } from "@/components/toast";
+import { UpdatedLabel } from "@/components/updated-label";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
 import { refreshErrorMessage } from "@/utils/error-copy";
-import { formatTime } from "@/utils/formatters";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -85,9 +85,7 @@ export default function DashboardScreen() {
         ListEmptyComponent={emptyState}
         ListFooterComponent={
           updatedAt === null ? null : (
-            <Text style={styles.updatedAt}>
-              Updated {formatTime(updatedAt)} · Pull down to refresh
-            </Text>
+            <UpdatedLabel style={styles.updatedAt} updatedAt={updatedAt} />
           )
         }
         onRefresh={refresh}

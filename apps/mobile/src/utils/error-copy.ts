@@ -1,6 +1,6 @@
 import type { DisplayError } from "@crypto-markets/api";
 
-import { formatTime } from "@/utils/formatters";
+import { formatAge } from "@/utils/formatters";
 
 // "45 s", "2 min": how long the server asked us to wait.
 export function formatWait(seconds: number) {
@@ -13,6 +13,7 @@ export function formatWait(seconds: number) {
 export function refreshErrorMessage(
   error: DisplayError,
   updatedAt: number | null,
+  now = Date.now(),
 ) {
   if (error.retryAfterSeconds) {
     return `Couldn't refresh · try again in ${formatWait(error.retryAfterSeconds)}`;
@@ -21,5 +22,5 @@ export function refreshErrorMessage(
   const problem = error.kind === "offline" ? "Can't connect" : "Couldn't refresh";
   return updatedAt === null
     ? problem
-    : `${problem} · showing prices from ${formatTime(updatedAt)}`;
+    : `${problem} · prices updated ${formatAge(updatedAt, now)}`;
 }

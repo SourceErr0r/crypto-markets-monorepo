@@ -79,7 +79,7 @@ Reading the proxy's `Cache-Control` header to set `staleTime` would remove the d
 
 **Devices revalidate with the proxy instead of caching on their own.** The proxy sends `Cache-Control: no-cache`, so the platform HTTP cache (`NSURLCache` on iOS, OkHttp on Android, the browser cache on web) must ask the proxy before reusing a response. An earlier `max-age` equal to the proxy's remaining cache lifetime let the device answer refreshes itself: pull-to-refresh did nothing and failures never reached the app. Revalidating costs one Worker request answered from KV, not a CoinGecko call. That leaves two caches with clear owners: the proxy's protects the upstream budget, and the query cache decides what the user sees.
 
-**"Updated 14:05" is CoinGecko's `last_updated`, not the fetch time.** The time a response arrived says nothing about how old the prices are once caches sit in between. CoinGecko's own timestamp passes through every layer unchanged, so the dashboard shows the newest `last_updated` among its coins, and coin details shows the coin's own.
+**"Updated 12 min ago" comes from CoinGecko's `last_updated`, not the fetch time.** The time a response arrived says nothing about how old the prices are once caches sit in between. CoinGecko's own timestamp passes through every layer unchanged, so the dashboard shows the age of the newest `last_updated` among its coins. A relative age suits a list that only gets new prices every 15 minutes: after a pull-to-refresh that brings nothing new, "12 min ago" is still true, where a clock time would look like the refresh had failed.
 
 Price-history uses `keepPreviousData`, so switching between 1D, 7D and 30D keeps the old chart visible with a status line in order to preserve the screen layout.
 
