@@ -17,6 +17,11 @@ export type {
   HistoryDays,
   PriceHistoryPoint,
 } from "./types";
+export {
+  ALL_MARKETS_MAX_PAGES,
+  ALL_MARKETS_PAGE_SIZE,
+  useAllMarkets,
+} from "./hooks/use-all-markets";
 export { useCryptocurrencies } from "./hooks/use-cryptocurrencies";
 export { useCryptocurrencyDetails } from "./hooks/use-cryptocurrency-details";
 export { useCryptocurrencySearch } from "./hooks/use-cryptocurrency-search";

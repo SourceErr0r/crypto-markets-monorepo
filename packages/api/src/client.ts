@@ -139,18 +139,28 @@ export function createApiClient(
     return result.data;
   }
 
-  async function getTopCryptocurrencies(
+  // One page of coins ranked by market cap. `page` is 1-based. The proxy
+  // allows per_page 10, 50, 100 or 250 and pages 1-100.
+  async function getMarkets(
     currency: CurrencyCode,
+    { page, perPage }: { page: number; perPage: number },
     signal?: AbortSignal,
   ): Promise<Cryptocurrency[]> {
     const params = new URLSearchParams({
       vs_currency: currency,
       order: "market_cap_desc",
-      per_page: "10",
-      page: "1",
+      per_page: String(perPage),
+      page: String(page),
     });
 
     return request(`/coins/markets?${params.toString()}`, marketsSchema, signal);
+  }
+
+  async function getTopCryptocurrencies(
+    currency: CurrencyCode,
+    signal?: AbortSignal,
+  ): Promise<Cryptocurrency[]> {
+    return getMarkets(currency, { page: 1, perPage: 10 }, signal);
   }
 
   // The proxy sets CoinGecko's detail flags itself and returns market data in
@@ -204,6 +214,7 @@ export function createApiClient(
   }
 
   return {
+    getMarkets,
     getTopCryptocurrencies,
     getCryptocurrencyDetails,
     getCryptocurrencyPriceHistory,

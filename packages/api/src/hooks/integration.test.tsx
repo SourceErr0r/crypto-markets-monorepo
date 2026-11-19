@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +7,7 @@ import { retryDelay, shouldRetry } from "../retry";
 import { marketsFixture, proxyError, TEST_BASE_URL } from "../testing";
 import { server } from "../testing/server";
 import { createWrapper } from "./test-wrapper";
+import { ALL_MARKETS_PAGE_SIZE, useAllMarkets } from "./use-all-markets";
 import { useCryptocurrencies } from "./use-cryptocurrencies";
 import { useCryptocurrencyDetails } from "./use-cryptocurrency-details";
 
@@ -105,5 +106,38 @@ describe("retry policy against the proxy's rate limits", () => {
     await waitFor(() => expect(result.current.cryptocurrencies).toHaveLength(2));
     expect(result.current.error).toBeNull();
     expect(calls()).toBe(2);
+  });
+});
+
+describe("All markets pagination against the proxy", () => {
+  // A full page of valid coins, so the hook asks for another.
+  const fullPage = Array.from({ length: ALL_MARKETS_PAGE_SIZE }, (_, i) => ({
+    ...marketsFixture[0],
+    id: `coin-${i}`,
+  }));
+
+  it("keeps page 1 when page 2 is rate-limited, and says when to retry", async () => {
+    server.use(
+      http.get(`${TEST_BASE_URL}/coins/markets`, ({ request }) =>
+        new URL(request.url).searchParams.get("page") === "1"
+          ? HttpResponse.json(fullPage)
+          : proxyError(429, "rate_limited", { retryAfterSeconds: 60 }),
+      ),
+    );
+    const { result } = renderHook(() => useAllMarkets("usd"), {
+      wrapper: createWrapper(api, { retry: shouldRetry, retryDelay }),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.loadMore());
+
+    await waitFor(() =>
+      expect(result.current.loadMoreError).toMatchObject({
+        kind: "rate-limited",
+        retryAfterSeconds: 60,
+      }),
+    );
+    expect(result.current.error).toBeNull();
+    expect(result.current.cryptocurrencies).toHaveLength(ALL_MARKETS_PAGE_SIZE);
   });
 });
