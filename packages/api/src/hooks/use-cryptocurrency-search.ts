@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import { MIN_SEARCH_LENGTH } from "../client";
 import { useApiClient } from "../client-context";
-import { getErrorMessage } from "../errors";
+import { toDisplayError } from "../errors";
 
 // The API is rate limited, so wait for typing to pause.
 const DEBOUNCE_MS = 400;
@@ -36,7 +36,7 @@ export function useCryptocurrencySearch(query: string) {
     hasTerm,
     results: hasTerm ? (data ?? []) : [],
     // Hide a stale error while a new search or retry is under way.
-    error: hasTerm && !isLoading && error ? getErrorMessage(error) : null,
+    error: hasTerm && !isLoading && error ? toDisplayError(error) : null,
     isLoading,
     retry: () => void refetch(),
   };

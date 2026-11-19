@@ -4,9 +4,10 @@ export { ApiClientProvider, useApiClient } from "./client-context";
 export { CURRENCY_CODES, type CurrencyCode } from "./currencies";
 export {
   ApiError,
-  getErrorMessage,
   isRetryable,
   type ApiErrorKind,
+  type DisplayError,
+  type DisplayErrorKind,
 } from "./errors";
 export { retryDelay, shouldRetry } from "./retry";
 export type {

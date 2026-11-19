@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { useApiClient } from "../client-context";
-import { getErrorMessage } from "../errors";
+import { toDisplayError } from "../errors";
 import type { HistoryDays, PriceHistoryPoint } from "../types";
 import type { CurrencyCode } from "../currencies";
 
@@ -39,7 +39,7 @@ export function usePriceHistory(
 
   return {
     history: hasChart ? data : null,
-    error: error ? getErrorMessage(error) : null,
+    error: error ? toDisplayError(error) : null,
     isLoading: isPending || isPlaceholderData,
     isEmpty: data !== undefined && !isPlaceholderData && !hasChart,
     retry: () => void refetch(),

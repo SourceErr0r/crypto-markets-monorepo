@@ -1,9 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { http } from "msw";
+import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { createApiClient } from "../client";
-import { proxyError, TEST_BASE_URL } from "../testing";
+import { retryDelay, shouldRetry } from "../retry";
+import { marketsFixture, proxyError, TEST_BASE_URL } from "../testing";
 import { server } from "../testing/server";
 import { createWrapper } from "./test-wrapper";
 import { useCryptocurrencies } from "./use-cryptocurrencies";
@@ -38,8 +39,12 @@ describe("hooks with the real client", () => {
     });
 
     await waitFor(() =>
-      expect(result.current.error).toMatch(/too many requests/i),
+      expect(result.current.error?.message).toMatch(/too many requests/i),
     );
+    expect(result.current.error).toMatchObject({
+      kind: "rate-limited",
+      retryAfterSeconds: 30,
+    });
     expect(result.current.cryptocurrencies).toEqual([]);
   });
 
@@ -50,7 +55,55 @@ describe("hooks with the real client", () => {
     );
 
     await waitFor(() =>
-      expect(result.current.error).toBe("We couldn't find that cryptocurrency."),
+      expect(result.current.error?.message).toBe("We couldn't find that cryptocurrency."),
     );
+  });
+});
+
+describe("retry policy against the proxy's rate limits", () => {
+  const withPolicy = () =>
+    createWrapper(api, { retry: shouldRetry, retryDelay });
+
+  // Counts calls to the markets endpoint, answering each with the next response.
+  function respondInTurn(...responses: (() => Response)[]) {
+    let calls = 0;
+    server.use(
+      http.get(`${TEST_BASE_URL}/coins/markets`, () => {
+        const respond = responses[Math.min(calls, responses.length - 1)];
+        calls += 1;
+        return respond();
+      }),
+    );
+    return () => calls;
+  }
+
+  it("shows a long Retry-After straight away instead of retrying", async () => {
+    const calls = respondInTurn(() =>
+      proxyError(429, "rate_limited", { retryAfterSeconds: 60 }),
+    );
+    const { result } = renderHook(() => useCryptocurrencies("usd"), {
+      wrapper: withPolicy(),
+    });
+
+    // TanStack only sets `error` once it has stopped retrying, so seeing it
+    // here (well inside 60 s) means no retry was scheduled.
+    await waitFor(() => expect(result.current.error?.kind).toBe("rate-limited"));
+    expect(result.current.error?.retryAfterSeconds).toBe(60);
+    expect(calls()).toBe(1);
+  });
+
+  it("waits out a short Retry-After and then succeeds", async () => {
+    // 0 s keeps the test fast; the policy treats it like any short wait.
+    const calls = respondInTurn(
+      () => proxyError(503, "upstream_busy", { retryAfterSeconds: 0 }),
+      () => HttpResponse.json(marketsFixture),
+    );
+    const { result } = renderHook(() => useCryptocurrencies("usd"), {
+      wrapper: withPolicy(),
+    });
+
+    await waitFor(() => expect(result.current.cryptocurrencies).toHaveLength(2));
+    expect(result.current.error).toBeNull();
+    expect(calls()).toBe(2);
   });
 });

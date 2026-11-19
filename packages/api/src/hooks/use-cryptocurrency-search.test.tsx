@@ -57,7 +57,7 @@ describe("useCryptocurrencySearch", () => {
     });
 
     act(() => vi.advanceTimersByTime(500));
-    await waitFor(() => expect(result.current.error).toBe("Rate limited"));
+    await waitFor(() => expect(result.current.error?.message).toBe("Rate limited"));
     expect(result.current.isLoading).toBe(false);
   });
 });

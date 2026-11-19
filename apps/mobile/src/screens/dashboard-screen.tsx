@@ -40,7 +40,7 @@ export default function DashboardScreen() {
       message="Fetching the top cryptocurrencies."
     />
   ) : error ? (
-    <StateMessage title="Failed to load" message={error} onRetry={refresh} />
+    <StateMessage title="Failed to load" message={error.message} onRetry={refresh} />
   ) : (
     <StateMessage
       title="No cryptocurrencies found"

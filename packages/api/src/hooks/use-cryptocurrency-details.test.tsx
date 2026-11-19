@@ -38,7 +38,7 @@ describe("useCryptocurrencyDetails", () => {
       wrapper: createWrapper(api),
     });
 
-    await waitFor(() => expect(result.current.error).toBe(UNKNOWN_ERROR_MESSAGE));
+    await waitFor(() => expect(result.current.error?.message).toBe(UNKNOWN_ERROR_MESSAGE));
   });
 
   it("reports the error message and clears it when retried", async () => {
@@ -47,7 +47,7 @@ describe("useCryptocurrencyDetails", () => {
       wrapper: createWrapper(api),
     });
 
-    await waitFor(() => expect(result.current.error).toBe("Coin not found"));
+    await waitFor(() => expect(result.current.error?.message).toBe("Coin not found"));
     expect(result.current.data).toBeUndefined();
 
     getDetails.mockResolvedValue(bitcoin);

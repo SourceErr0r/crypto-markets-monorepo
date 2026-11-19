@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ApiError,
-  getErrorMessage,
   httpErrorMessage,
   isRetryable,
   parseRetryAfter,
+  toDisplayError,
   UNKNOWN_ERROR_MESSAGE,
 } from "./errors";
 
@@ -36,16 +36,39 @@ describe("httpErrorMessage", () => {
   });
 });
 
-describe("getErrorMessage", () => {
-  it("returns the message of a ApiError", () => {
-    expect(getErrorMessage(new ApiError("Try later", { kind: "http", status: 503 }))).toBe("Try later");
+describe("toDisplayError", () => {
+  it.each([
+    [{ kind: "network" } as const, "offline"],
+    [{ kind: "timeout" } as const, "timeout"],
+    [{ kind: "http", status: 408 } as const, "timeout"],
+    [{ kind: "http", status: 429 } as const, "rate-limited"],
+    [{ kind: "http", status: 404 } as const, "not-found"],
+    [{ kind: "http", status: 502 } as const, "unavailable"],
+    [{ kind: "http", status: 400 } as const, "unknown"],
+    [{ kind: "invalid-response" } as const, "unknown"],
+  ])("describes %j as %s", (details, kind) => {
+    expect(toDisplayError(new ApiError("msg", details)).kind).toBe(kind);
+  });
+
+  it("keeps the message and how long to wait", () => {
+    const error = new ApiError("Slow down", {
+      kind: "http",
+      status: 429,
+      retryAfterSeconds: 60,
+    });
+    expect(toDisplayError(error)).toEqual({
+      kind: "rate-limited",
+      message: "Slow down",
+      retryAfterSeconds: 60,
+    });
   });
 
   it("hides the message of any other error", () => {
-    expect(getErrorMessage(new TypeError("x is not a function"))).toBe(
-      UNKNOWN_ERROR_MESSAGE,
-    );
-    expect(getErrorMessage("boom")).toBe(UNKNOWN_ERROR_MESSAGE);
+    expect(toDisplayError(new TypeError("x is not a function"))).toEqual({
+      kind: "unknown",
+      message: UNKNOWN_ERROR_MESSAGE,
+    });
+    expect(toDisplayError("boom").message).toBe(UNKNOWN_ERROR_MESSAGE);
   });
 });
 

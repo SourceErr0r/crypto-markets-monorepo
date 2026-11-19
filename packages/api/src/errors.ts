@@ -92,9 +92,48 @@ export function isRetryable(error: unknown) {
   return false;
 }
 
+// What the UI needs to know about a failure, in the UI's terms rather than
+// HTTP's, so screens can pick copy ("you're offline", "try again in 60 s")
+// without knowing status codes:
+// - offline: no response at all, usually no connection
+// - timeout: the server was too slow
+// - rate-limited: we sent too many requests (429)
+// - not-found: the coin doesn't exist (404)
+// - unavailable: a server-side problem (5xx)
+// - unknown: anything else, including bad responses and our own bugs
+export type DisplayErrorKind =
+  | "offline"
+  | "timeout"
+  | "rate-limited"
+  | "not-found"
+  | "unavailable"
+  | "unknown";
+
+export type DisplayError = {
+  kind: DisplayErrorKind;
+  // Safe to show as-is.
+  message: string;
+  // Set when the server said how long to wait (429, or 503 at the proxy).
+  retryAfterSeconds?: number;
+};
+
+function displayKind(error: ApiError): DisplayErrorKind {
+  if (error.kind === "network") return "offline";
+  if (error.kind === "timeout" || error.status === 408) return "timeout";
+  if (error.status === 429) return "rate-limited";
+  if (error.status === 404) return "not-found";
+  if ((error.status ?? 0) >= 500) return "unavailable";
+  return "unknown";
+}
+
 // The only way errors should reach the UI: raw messages never leak through.
-export function getErrorMessage(error: unknown) {
-  return error instanceof ApiError
-    ? error.message
-    : UNKNOWN_ERROR_MESSAGE;
+export function toDisplayError(error: unknown): DisplayError {
+  if (!(error instanceof ApiError)) {
+    return { kind: "unknown", message: UNKNOWN_ERROR_MESSAGE };
+  }
+  return {
+    kind: displayKind(error),
+    message: error.message,
+    retryAfterSeconds: error.retryAfterSeconds,
+  };
 }
