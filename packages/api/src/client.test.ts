@@ -1,4 +1,4 @@
-import { http, HttpResponse, type JsonBodyType } from "msw";
+import { delay, http, HttpResponse, type JsonBodyType } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { createApiClient } from "./client";
@@ -6,6 +6,7 @@ import {
   ApiError,
   INVALID_RESPONSE_MESSAGE,
   NETWORK_ERROR_MESSAGE,
+  TIMEOUT_MESSAGE,
 } from "./errors";
 import {
   coinDetailsFixture,
@@ -58,6 +59,7 @@ describe("getTopCryptocurrencies", () => {
       current_price: 65000,
       total_volume: 30000000000,
       market_cap: 1280000000000,
+      last_updated: "2026-11-18T12:00:30.000Z",
     });
   });
 
@@ -76,6 +78,7 @@ describe("getTopCryptocurrencies", () => {
         current_price: null,
         total_volume: null,
         market_cap: null,
+        last_updated: null,
       },
     ]);
   });
@@ -300,6 +303,17 @@ describe("failures", () => {
     },
   );
 
+  it("keeps the proxy's Retry-After so callers know how long to wait", async () => {
+    respondWith("/coins/markets", () =>
+      proxyError(429, "rate_limited", { retryAfterSeconds: 60 }),
+    );
+
+    await expect(api.getTopCryptocurrencies("usd")).rejects.toMatchObject({
+      status: 429,
+      retryAfterSeconds: 60,
+    });
+  });
+
   it("handles error responses that are not JSON", async () => {
     respondWith(
       "/coins/markets",
@@ -335,6 +349,33 @@ describe("failures", () => {
       message: INVALID_RESPONSE_MESSAGE,
       kind: "invalid-response",
     });
+  });
+
+  it("gives up on a response that takes too long", async () => {
+    const quickApi = createApiClient(TEST_BASE_URL, { timeoutMs: 20 });
+    server.use(
+      http.get(`${TEST_BASE_URL}/coins/markets`, async () => {
+        await delay("infinite");
+        return HttpResponse.json(marketsFixture);
+      }),
+    );
+
+    await expect(quickApi.getTopCryptocurrencies("usd")).rejects.toMatchObject({
+      message: TIMEOUT_MESSAGE,
+      kind: "timeout",
+    });
+  });
+
+  it("does not time out a response that arrives in time", async () => {
+    const quickApi = createApiClient(TEST_BASE_URL, { timeoutMs: 200 });
+    server.use(
+      http.get(`${TEST_BASE_URL}/coins/markets`, async () => {
+        await delay(10);
+        return HttpResponse.json(marketsFixture);
+      }),
+    );
+
+    await expect(quickApi.getTopCryptocurrencies("usd")).resolves.toHaveLength(2);
   });
 
   it("lets cancelled requests through unchanged, not as failures", async () => {

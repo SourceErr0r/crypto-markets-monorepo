@@ -78,3 +78,21 @@ export function formatMarketCap(
     maximumFractionDigits: 2,
   })}${suffix}`;
 }
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+// How old data is, for "Updated 12 min ago". Rounded down, so it never
+// claims data is older than it is. A device clock behind the server's counts
+// as "just now" rather than a negative age.
+export function formatAge(timestamp: number, now: number) {
+  const age = Math.max(now - timestamp, 0);
+  if (age < MINUTE_MS) return "just now";
+  if (age < HOUR_MS) return `${Math.floor(age / MINUTE_MS)} min ago`;
+  if (age < DAY_MS) return `${Math.floor(age / HOUR_MS)} h ago`;
+  return `on ${new Date(timestamp).toLocaleDateString(LOCALE, {
+    day: "numeric",
+    month: "short",
+  })}`;
+}

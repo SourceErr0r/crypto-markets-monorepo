@@ -15,6 +15,7 @@ export const marketsFixture = [
     total_volume: 30000000000,
     market_cap: 1280000000000,
     fully_diluted_valuation: 1365000000000,
+    last_updated: "2026-11-18T12:00:30.000Z",
   },
   {
     id: "ethereum",
@@ -26,6 +27,7 @@ export const marketsFixture = [
     total_volume: 15000000000,
     market_cap: 385000000000,
     fully_diluted_valuation: 385000000000,
+    last_updated: "2026-11-18T12:00:00.000Z",
   },
 ];
 

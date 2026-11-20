@@ -25,6 +25,9 @@ export const cryptocurrencySchema = z.object({
   current_price: optionalNumber,
   total_volume: optionalNumber,
   market_cap: optionalNumber,
+  // When CoinGecko last updated this coin's price. Survives every cache
+  // between here and CoinGecko, so it's the honest age of the data.
+  last_updated: z.string().nullable().catch(null),
 });
 
 export const marketsSchema = z.array(cryptocurrencySchema);

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -11,14 +11,24 @@ import { CryptocurrencyRow } from "@/components/cryptocurrency-row";
 import { CurrencyMenu } from "@/components/currency-menu";
 import { SearchButton } from "@/components/search-button";
 import { StateMessage } from "@/components/state-message";
+import { Toast } from "@/components/toast";
+import { UpdatedLabel } from "@/components/updated-label";
 import type { CurrencyCode } from "@/constants/currencies";
 import { theme } from "@/constants/theme";
+import { refreshErrorMessage } from "@/utils/error-copy";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [currency, setCurrency] = useState<CurrencyCode>("gbp");
-  const { cryptocurrencies, error, isLoading, isRefreshing, refresh } =
-    useCryptocurrencies(currency);
+  const {
+    cryptocurrencies,
+    error,
+    errorUpdatedAt,
+    isLoading,
+    isRefreshing,
+    refresh,
+    updatedAt,
+  } = useCryptocurrencies(currency);
 
   const handleCryptocurrencyPress = (id: string) => {
     const coin = cryptocurrencies.find((item) => item.id === id);
@@ -27,6 +37,10 @@ export default function DashboardScreen() {
       pathname: "/coin/[id]",
       params: { id, currency, name: coin?.name ?? id },
     });
+  };
+
+  const handleSeeAllPress = () => {
+    router.push({ pathname: "/markets", params: { currency } });
   };
 
   const handleSearchPress = () => {
@@ -40,7 +54,7 @@ export default function DashboardScreen() {
       message="Fetching the top cryptocurrencies."
     />
   ) : error ? (
-    <StateMessage title="Failed to load" message={error} onRetry={refresh} />
+    <StateMessage title="Failed to load" message={error.message} onRetry={refresh} />
   ) : (
     <StateMessage
       title="No cryptocurrencies found"
@@ -62,7 +76,21 @@ export default function DashboardScreen() {
         <Text style={styles.subtitle}>
           Top cryptocurrencies by market capitalisation.
         </Text>
-        <Text style={styles.listLabel}>TOP 10 BY MARKET CAP</Text>
+        <View style={styles.listLabelRow}>
+          <Text style={styles.listLabel}>TOP 10 BY MARKET CAP</Text>
+          <Pressable
+            accessibilityLabel="See all markets"
+            accessibilityRole="link"
+            hitSlop={12}
+            onPress={handleSeeAllPress}
+          >
+            {({ pressed }) => (
+              <Text style={[styles.seeAll, pressed && styles.seeAllPressed]}>
+                See all
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
       <FlatList
         contentContainerStyle={[
@@ -73,6 +101,11 @@ export default function DashboardScreen() {
         data={cryptocurrencies}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={emptyState}
+        ListFooterComponent={
+          updatedAt === null ? null : (
+            <UpdatedLabel style={styles.updatedAt} updatedAt={updatedAt} />
+          )
+        }
         onRefresh={refresh}
         refreshing={isRefreshing}
         renderItem={({ item }) => (
@@ -85,6 +118,13 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       />
+      {/* With nothing to show, the error fills the list instead (emptyState). */}
+      {error && cryptocurrencies.length > 0 && (
+        <Toast
+          key={errorUpdatedAt}
+          message={refreshErrorMessage(error, updatedAt)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -137,11 +177,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
+  updatedAt: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 16,
+    textAlign: "center",
+  },
+  listLabelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 24,
+  },
   listLabel: {
     color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
-    marginTop: 24,
+  },
+  seeAll: {
+    color: theme.colors.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  seeAllPressed: {
+    opacity: 0.6,
   },
 });

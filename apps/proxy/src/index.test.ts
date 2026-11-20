@@ -115,7 +115,8 @@ describe("caching", () => {
     const response = await get("/coins/markets?vs_currency=gbp");
     expect(response.headers.get("X-Cache")).toBe("HIT");
     expect(Number(response.headers.get("Age"))).toBeGreaterThanOrEqual(120);
-    expect(response.headers.get("Cache-Control")).toMatch(/max-age=(7[0-9]{2}|780)/);
+    // Clients must come back to us rather than reuse their copy.
+    expect(response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("refreshes an expired entry", async () => {
@@ -136,7 +137,7 @@ describe("when CoinGecko fails", () => {
     const response = await get("/coins/markets?vs_currency=gbp");
     expect(response.status).toBe(200);
     expect(response.headers.get("X-Cache")).toBe("STALE");
-    expect(response.headers.get("Cache-Control")).toBe("public, max-age=0");
+    expect(response.headers.get("Cache-Control")).toBe("no-cache");
     expect(await response.json()).toEqual([{ id: "old" }]);
   });
 

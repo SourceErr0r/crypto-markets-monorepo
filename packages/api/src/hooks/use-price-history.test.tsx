@@ -87,7 +87,7 @@ describe("usePriceHistory", () => {
     getHistory.mockRejectedValueOnce(new ApiError("Rate limited", { kind: "http", status: 429 }));
     const { result } = renderHistory();
 
-    await waitFor(() => expect(result.current.error).toBe("Rate limited"));
+    await waitFor(() => expect(result.current.error?.message).toBe("Rate limited"));
     expect(result.current.isLoading).toBe(false);
 
     getHistory.mockResolvedValue(points);

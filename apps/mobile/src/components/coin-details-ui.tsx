@@ -1,3 +1,4 @@
+import type { DisplayError } from "@crypto-markets/api";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -125,14 +126,14 @@ export function LoadState({
   retry,
   label,
 }: {
-  error: string | null;
+  error: DisplayError | null;
   retry: () => void;
   label: string;
 }) {
   return (
     <View style={styles.state} accessibilityLiveRegion="polite">
       {!error && <ActivityIndicator color={theme.colors.accent} />}
-      <MutedText>{error ?? label}</MutedText>
+      <MutedText>{error?.message ?? label}</MutedText>
       {error && <ActionButton label="Try again" onPress={retry} />}
     </View>
   );

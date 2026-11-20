@@ -37,7 +37,7 @@ export default function SearchScreen() {
   const emptyState = isLoading ? (
     <StateMessage loading />
   ) : error ? (
-    <StateMessage title="Search failed" message={error} onRetry={retry} />
+    <StateMessage title="Search failed" message={error.message} onRetry={retry} />
   ) : hasTerm ? (
     <StateMessage
       title="No results"
