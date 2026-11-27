@@ -29,6 +29,8 @@ With the Expo development server running, press `i` to open the iOS Simulator or
 
 **Next.js web app:** with the proxy running, `pnpm web:next` starts it on http://localhost:3000. It calls the proxy at `localhost:8787` by default; to use another proxy, set `NEXT_PUBLIC_API_BASE_URL` in `apps/web/.env.local` (copy it from `apps/web/.env.example`).
 
+**Watchlist API (in progress):** `pnpm api` starts the apps' own backend (`apps/api`, a Cloudflare Worker with a local D1 database) on http://localhost:8788. It applies the database migrations first. No app uses it yet; the contract is in [docs/watchlist-api.md](docs/watchlist-api.md).
+
 All of these run without any configuration. Add an API key if you want higher rate limits.
 
 **Physical device:** start the proxy with `pnpm proxy --ip 0.0.0.0`, then set `EXPO_PUBLIC_API_BASE_URL=http://<your-LAN-IP>:8787` in `apps/mobile/.env.local` (copy it from `apps/mobile/.env.example`). Restart the Expo server after changing it.
@@ -71,6 +73,7 @@ apps/
       constants/    Currencies, locale and theme
   web/            Next.js web app (client-rendered), same src/ layout as mobile
   proxy/          API proxy (Cloudflare Worker): allow-list, caching, rate limiting
+  api/            Watchlist API (Cloudflare Worker + D1): users, watchlist, preferences
 packages/
   api/            Shared API layer: client, zod schemas, error mapping, TanStack Query
                   hooks, and MSW handlers for tests (@crypto-markets/api/testing)
@@ -85,6 +88,7 @@ pnpm android      # Start Expo and open Android emulator
 pnpm web          # Start the Expo app's web version
 pnpm web:next     # Start the Next.js web app
 pnpm proxy        # Start the API proxy locally
+pnpm api          # Start the watchlist API locally
 pnpm test         # Run tests in every workspace package
 pnpm lint         # Lint every workspace package
 pnpm typecheck    # Type-check every workspace package
