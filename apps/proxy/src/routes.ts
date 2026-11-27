@@ -36,6 +36,7 @@ const CHART_TTL: Record<string, number> = {
 };
 
 // Starts with a letter or digit, so "." and ".." can't be used as an id.
+// Copy of COIN_ID_PATTERN in packages/api/src/watchlist-schemas.ts; keep in sync.
 const COIN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/;
 // CoinGecko endpoints that sit where a coin id would (/coins/list is every
 // coin, not a coin called "list"). Without this, `/coins/list?vs_currency=usd`
