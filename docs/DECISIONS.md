@@ -142,6 +142,16 @@ Expo configures Metro for monorepos automatically, so there is no custom `metro.
 
 **Hosting: Cloudflare Workers via OpenNext.** This keeps it on the same platform and account as the proxy, with clean `/coins/[id]` URLs, and Workers Builds now provides per-branch preview URLs. Vercel would avoid the OpenNext adapter, and is the fallback if the adapter causes trouble. For a client-rendered app that risk is low. Deployment, and restricting the proxy's CORS to the web domain, come with the release pipeline.
 
+### Watchlist API
+
+Planned, not yet built. The full contract is in [watchlist-api.md](watchlist-api.md). It gives users a watchlist and saved preferences (currency, theme) shared between the mobile and web apps.
+
+**A separate Worker, not part of the proxy.** The watchlist API lives in its own `apps/api` Worker with a D1 database. The proxy is a stateless cache in front of a third-party API, protecting a monthly call budget. The watchlist API owns user data and needs auth. Keeping them apart means a bug in one can't expose the other, each gets rate limits that suit it (per IP for the proxy, per user for the API), and the proxy stays free of user state. One Worker with two sets of routes would mean one deployment and one CORS setup, and would be the better choice for a throwaway demo. The API stores coin ids only; the apps fetch prices for them through the proxy, so CoinGecko is called from one place.
+
+**Anonymous users first, accounts later.** The apps work without sign-up: the first launch creates an anonymous user and receives a random bearer token, of which the database stores only a hash. Signing in, when it is built, will attach an identity to the existing user rather than create a new one, so moving from anonymous to signed-in keeps the watchlist without copying or merging anything. Starting with a hosted auth service such as Supabase Auth would give real accounts straight away, but adds an external dependency and a sign-up step before cross-device sync is needed. An auth library on D1 (Better Auth) would keep everything on Cloudflare, at the cost of more code to own.
+
+**Per-coin, idempotent writes.** Coins are added with `PUT /v1/watchlist/{coinId}` and removed with `DELETE`, and both return 204 whether or not anything changed. Two devices editing at once can't overwrite each other's changes, as they could if the whole list were replaced, and a timed-out write can be retried safely.
+
 ### Continuous integration
 
 A single GitHub Actions workflow runs on every pull request and on pushes to `main`. It installs with a frozen lockfile, then runs `pnpm lint`, `pnpm typecheck` and `pnpm test` across every workspace package: the same commands used locally. Node is pinned in `.nvmrc` and pnpm in the root `package.json` `packageManager` field, so local and CI toolchains match.
