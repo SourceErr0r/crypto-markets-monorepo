@@ -41,3 +41,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+      # Catches what the checks above can't: bundling, route and
+      # server/client component errors. No NEXT_PUBLIC_API_BASE_URL needed;
+      # the app falls back to the local proxy URL and the build calls no API.
+      # .next/cache is not cached: the build takes seconds, and restoring
+      # Turbopack's cache would cost about as much as it saves.
+      - run: pnpm --filter web build
