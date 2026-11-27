@@ -122,13 +122,25 @@ The shared API package is tested at two boundaries. Client tests run against [MS
 
 The proxy is tested with Vitest inside the Workers runtime (`@cloudflare/vitest-plugin`), against local KV and rate-limit bindings, with CoinGecko replaced by a stub of `fetch`. The tests cover the allow-list, cache key normalisation, hits and refreshes, trimming, serving stale data on failure, error mapping and the per-IP limit. Jest stays in the mobile app because `jest-expo` is the supported setup there; the proxy needs the Workers runtime, which Jest can't provide.
 
+The web app has screen tests: React Testing Library and user-event render the real screens inside the real providers, with MSW answering from the shared handlers in `@crypto-markets/api/testing`. They check what a user sees and does (the top 10, expanding a row, searching and closing search with Escape, a failed refresh over cached data, an error with retry, an unknown coin) and which requests are sent, for example that details are only fetched when a row is opened. Retries are turned off in tests so error states appear immediately.
+
 ### Monorepo layout
 
-The project is a pnpm workspace: the Expo app lives in `apps/mobile`, the API proxy in `apps/proxy`, and `packages/api` holds the shared API layer (client, schemas, query hooks) so a web app can reuse it. Logic is shared, UI is not; the web app will have its own interface.
+The project is a pnpm workspace: the Expo app lives in `apps/mobile`, the API proxy in `apps/proxy`, and `packages/api` holds the shared API layer (client, schemas, query hooks) and the Next.js web app in `apps/web` reuses it. Logic is shared, UI is not: the web app has its own interface (see [Web app](#web-app)).
 
 Plain pnpm workspaces were chosen over Turborepo or Nx. With two or three packages, a task runner's caching and dependency graph don't save enough time to justify another tool to learn and configure; `pnpm -r` runs lint, typecheck and tests across every package. That would be revisited if CI times grow. Separate repositories were ruled out because shared types would then need publishing and versioning.
 
 Expo configures Metro for monorepos automatically, so there is no custom `metro.config.js`. pnpm's default isolated install is kept rather than `nodeLinker: hoisted`, which keeps each package's dependencies explicit. Hoisting is the fallback if a native library fails to resolve.
+
+### Web app
+
+`apps/web` is a minimal Next.js app: the top 10, coin details and search. It reuses `@crypto-markets/api` (client, schemas, query hooks) and has its own UI. There is no price chart or All markets page yet.
+
+**Client-rendered.** Pages render in the browser, and the browser calls the proxy directly, the same way the mobile app does. That keeps the proxy's per-IP rate limit meaningful: every request carries the real user's IP. Server rendering would send every request from the web server's IP, so the proxy would have to trust a forwarded IP header, which anyone can set unless the proxy only accepts it from the web server. Server rendering would win for SEO or first paint on slow devices; neither matters much for live prices that refetch anyway. The base URL comes from `NEXT_PUBLIC_API_BASE_URL`, which is public by design because the proxy holds the key.
+
+**Built for the browser, not ported from mobile.** On mobile each coin and the search are separate screens. On the web, rows expand in place and fetch details only when opened, and search opens inline with its results replacing the top 10. `/coins/[id]` still exists as a shareable page, linked from the expanded row. The currency is fixed to GBP. The web app has its own small `Intl` formatters, because browsers support compact notation natively. It leaves out the coin description, which would need the HTML sanitiser the mobile app uses.
+
+**Hosting: Cloudflare Workers via OpenNext.** This keeps it on the same platform and account as the proxy, with clean `/coins/[id]` URLs, and Workers Builds now provides per-branch preview URLs. Vercel would avoid the OpenNext adapter, and is the fallback if the adapter causes trouble. For a client-rendered app that risk is low. Deployment, and restricting the proxy's CORS to the web domain, come with the release pipeline.
 
 ### Continuous integration
 
@@ -136,10 +148,13 @@ A single GitHub Actions workflow runs on every pull request and on pushes to `ma
 
 It is one job rather than one per check. Installing dependencies is most of the run time, so parallel jobs would mostly repeat it. Every package is checked on every run; running only the packages affected by a change (`pnpm --filter "...[origin/main]"` or a task runner) would be worth it once there are several apps and CI time grows. Actions are pinned to major version tags; pinning to commit SHAs with Dependabot updates is the stricter option. No secrets are needed: the proxy tests use a fake key and never call CoinGecko.
 
+The last step builds the web app (`next build`), which catches build-only failures such as server/client component mistakes. Next's build cache (`.next/cache`) is not cached between runs. A cold build takes about 5 seconds and a warm one about 2.5, and restoring and saving the roughly 30 MB cache would take about as long as it saves.
+
 ## Known gaps and what I'd do next
 
 - Component/screen tests with React Native Testing Library.
 - Deploy the proxy from CI, and add the global budget guard described under [API proxy](#api-proxy).
+- Deploy the web app, and restrict the proxy's CORS to its domain.
 - Persist the selected currency and share it through context rather than route params.
 - Fold the detail screen's inline `LoadState` into the shared `StateMessage` (they are visually different, so left separate for now).
 - Pull-to-refresh exists on the dashboard and All markets only; the detail screen refreshes on retry after an error.
