@@ -20,5 +20,14 @@
       "database_name": "crypto-markets-api",
       "migrations_dir": "migrations"
     }
+  ],
+
+  // Counts are per Cloudflare location and approximate. Period must be 10 or
+  // 60 seconds. namespace_id must be unique in the account (the proxy uses 1001).
+  "ratelimits": [
+    // POST /v1/user, keyed by client IP.
+    { "name": "USER_CREATION_LIMITER", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } },
+    // Every other route, keyed by user id.
+    { "name": "USER_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }
   ]
 }
