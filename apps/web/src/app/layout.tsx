@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
+import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
@@ -13,7 +15,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <header className="site-header">
+          <nav aria-label="Main">
+            <Link href="/" className="brand">
+              Crypto Markets
+            </Link>
+          </nav>
+        </header>
+        <Providers>
+          <main>{children}</main>
+        </Providers>
       </body>
     </html>
   );
