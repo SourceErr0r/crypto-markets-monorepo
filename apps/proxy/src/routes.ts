@@ -11,6 +11,8 @@ import type { ApiError } from "./http";
 const CURRENCIES = ["gbp", "usd", "eur"];
 const PER_PAGE_VALUES = ["10", "50", "100", "250"];
 const MAX_PAGE = 100;
+// Matches the watchlist cap, so a whole watchlist fits in one request.
+const MAX_IDS = 50;
 const HISTORY_DAYS = ["1", "7", "30", "90", "365"];
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_MAX_LENGTH = 50;
@@ -81,6 +83,8 @@ function markets(params: URLSearchParams): RouteResult {
   const currency = oneOf(params, "vs_currency", CURRENCIES);
   if (!currency) return invalid("vs_currency must be one of: " + CURRENCIES.join(", "));
 
+  if (params.has("ids")) return marketsForIds(currency, params.get("ids") ?? "");
+
   const perPage = params.has("per_page") ? oneOf(params, "per_page", PER_PAGE_VALUES) : "10";
   if (!perPage) return invalid("per_page must be one of: " + PER_PAGE_VALUES.join(", "));
 
@@ -95,6 +99,28 @@ function markets(params: URLSearchParams): RouteResult {
     order: "market_cap_desc",
     per_page: perPage,
     page: String(page),
+  }, MARKETS_TTL);
+}
+
+// Markets for a given set of coins (the watchlist). The ids are deduplicated
+// and sorted, so the same set in any order shares one cache entry. `per_page`
+// is set to the cap and `page` to 1 so every requested coin comes back in one
+// response; client `page`/`per_page` are ignored like any other unknown param.
+function marketsForIds(currency: string, rawIds: string): RouteResult {
+  const ids = rawIds.split(",");
+  if (ids.some((id) => !COIN_ID_PATTERN.test(id))) {
+    return invalid("ids must be a comma-separated list of coin ids");
+  }
+
+  const unique = [...new Set(ids)].sort();
+  if (unique.length > MAX_IDS) return invalid(`ids can list at most ${MAX_IDS} coins`);
+
+  return ok("/coins/markets", {
+    vs_currency: currency,
+    ids: unique.join(","),
+    order: "market_cap_desc",
+    per_page: String(MAX_IDS),
+    page: "1",
   }, MARKETS_TTL);
 }
 

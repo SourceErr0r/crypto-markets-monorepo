@@ -19,6 +19,29 @@ describe("matchRoute", () => {
     expect(upstreamPath("/coins/markets?page=1&junk=x&order=volume_desc&vs_currency=GBP")).toBe(expected);
   });
 
+  it("dedupes and sorts ids, so the same set of coins shares a cache key", () => {
+    const expected =
+      "/coins/markets?vs_currency=usd&ids=bitcoin%2Cethereum%2Csolana&order=market_cap_desc&per_page=50&page=1";
+    expect(upstreamPath("/coins/markets?vs_currency=usd&ids=solana,bitcoin,ethereum")).toBe(expected);
+    expect(upstreamPath("/coins/markets?vs_currency=usd&ids=ethereum,solana,bitcoin,solana")).toBe(expected);
+  });
+
+  it("returns every requested coin in one page, ignoring page and per_page", () => {
+    expect(upstreamPath("/coins/markets?vs_currency=usd&ids=bitcoin&per_page=10&page=3")).toBe(
+      "/coins/markets?vs_currency=usd&ids=bitcoin&order=market_cap_desc&per_page=50&page=1",
+    );
+  });
+
+  it("accepts up to 50 distinct ids, counting duplicates once", () => {
+    const fifty = Array.from({ length: 50 }, (_, i) => `coin-${i}`);
+    expect(match(`/coins/markets?vs_currency=usd&ids=${fifty.join(",")}`).ok).toBe(true);
+    expect(match(`/coins/markets?vs_currency=usd&ids=${[...fifty, "coin-0"].join(",")}`).ok).toBe(true);
+    expect(match(`/coins/markets?vs_currency=usd&ids=${[...fifty, "coin-50"].join(",")}`)).toMatchObject({
+      ok: false,
+      error: { status: 400, code: "invalid_param" },
+    });
+  });
+
   it("keeps the currency out of the coin detail URL and returns it for trimming", () => {
     const result = match("/coins/bitcoin?vs_currency=EUR&tickers=true");
     expect(result).toEqual({
@@ -68,6 +91,13 @@ describe("matchRoute", () => {
     "/coins/markets?vs_currency=usd&page=0",
     "/coins/markets?vs_currency=usd&page=101",
     "/coins/markets?vs_currency=usd&page=1.5",
+    "/coins/markets?vs_currency=usd&ids=",
+    "/coins/markets?vs_currency=usd&ids=bitcoin,,ethereum",
+    "/coins/markets?vs_currency=usd&ids=bitcoin,",
+    "/coins/markets?vs_currency=usd&ids=Bitcoin",
+    "/coins/markets?vs_currency=usd&ids=bitcoin,%20ethereum",
+    "/coins/markets?vs_currency=usd&ids=..",
+    "/coins/markets?ids=bitcoin",
     "/coins/bitcoin",
     "/coins/bitcoin/market_chart?vs_currency=usd&days=2",
     "/coins/bitcoin/market_chart?vs_currency=usd&days=max",
