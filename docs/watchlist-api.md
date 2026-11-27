@@ -95,7 +95,7 @@ The user's watchlist, oldest first. An empty watchlist is `items: []`, not a 404
 }
 ```
 
-The response has ids only, no prices. The app passes the ids to the proxy's `/coins/markets?ids=…`. Prices are then cached and rate-limited in one place, and this API never calls CoinGecko or spends its budget.
+The response has ids only, no prices. The app passes the ids to the proxy's `/coins/markets?ids=…` (up to 50; the proxy sorts them and removes duplicates so any order shares one cache entry). Prices are then cached and rate-limited in one place, and this API never calls CoinGecko or spends its budget.
 
 ### `PUT /v1/watchlist/{coinId}`
 
