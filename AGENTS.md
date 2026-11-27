@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Expo / React Native app showing CoinGecko market data. Mobile-first, also runs on web.
+Expo / React Native app showing CoinGecko market data, plus a minimal Next.js web app. Mobile-first.
 
 ## Working rules
 
@@ -11,7 +11,8 @@ Expo / React Native app showing CoinGecko market data. Mobile-first, also runs o
 
 - Expo SDK 57, React Native 0.86 (New Architecture), React 19, TypeScript
 - Expo Router (file-based routes), TanStack Query for server state
-- Jest + jest-expo + React Native Testing Library (app); Vitest + MSW (`packages/api`, proxy)
+- Next.js 16 (`apps/web`, client-rendered pages, Turbopack)
+- Jest + jest-expo + React Native Testing Library (mobile); Vitest + MSW (`packages/api`, proxy); Vitest + React Testing Library + MSW (web)
 - zod for response validation (`packages/api`)
 - pnpm workspaces (`pnpm-workspace.yaml`, one `pnpm-lock.yaml` at the root)
 - CoinGecko API via `apps/proxy` (Cloudflare Worker); key in `apps/proxy/.dev.vars`, never in the app
@@ -28,6 +29,7 @@ From the repo root (`lint`, `typecheck`, `test` run in every workspace package):
 pnpm install                # install all workspaces
 pnpm start                  # Expo dev server (apps/mobile)
 pnpm proxy                  # API proxy on :8787 (wrangler dev; key in apps/proxy/.dev.vars)
+pnpm web:next               # Next.js web app (apps/web); `pnpm web` is Expo web
 pnpm lint                   # lint
 pnpm typecheck              # tsc --noEmit
 pnpm test                   # jest
@@ -40,6 +42,8 @@ npx expo install <package>  # ALWAYS use instead of pnpm add; resolves SDK-compa
 npx expo-doctor             # diagnose dependency/config issues
 pnpm test <path>            # targeted tests, e.g. pnpm test src/utils
 ```
+
+After editing any `package.json` by hand, run `pnpm install` and commit the lockfile (CI installs with `--frozen-lockfile`).
 
 Workspace packages are referenced as `"@crypto-markets/api": "workspace:*"`. Expo configures Metro for monorepos automatically; don't add `watchFolders` or other resolver overrides.
 
@@ -56,6 +60,9 @@ apps/
       components/  Small presentational components
       utils/       Pure helpers (formatting, chart data)
       constants/   Theme, currencies, locale
+  web/           Next.js app. Shares @crypto-markets/api, not UI. Same layout as mobile:
+                 src/app (routes only), screens/, components/, utils/, testing/.
+                 Next manages tsconfig.json; no transpilePackages needed.
   proxy/         Cloudflare Worker in front of CoinGecko: allow-list, KV cache, rate limit.
                  Tests run in the Workers runtime (Vitest + @cloudflare/vitest-plugin).
 packages/
