@@ -1,4 +1,5 @@
-// Placeholder until the pages step; proves the app builds and serves.
+import { TopCoinsScreen } from "@/screens/top-coins-screen";
+
 export default function HomePage() {
-  return <h1>Crypto Markets</h1>;
+  return <TopCoinsScreen />;
 }
