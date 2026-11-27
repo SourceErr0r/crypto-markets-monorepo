@@ -1,0 +1,19 @@
+{
+  "name": "watchlist-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm db:migrate && wrangler dev",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.8.3",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.0",
+    "wrangler": "4.163.0"
+  }
+}

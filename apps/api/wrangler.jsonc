@@ -1,0 +1,24 @@
+// Watchlist API: the apps' own backend (users, watchlist, preferences).
+// Contract: docs/watchlist-api.md.
+// https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "crypto-markets-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+
+  // The proxy uses 8787 locally.
+  "dev": { "port": 8788 },
+
+  // No database_id: Wrangler creates the database on first deploy, and
+  // `wrangler dev` uses a local SQLite file under .wrangler/.
+  // Schema changes are files in migrations/ (`pnpm db:migrate` applies them).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "crypto-markets-api",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

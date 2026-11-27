@@ -12,10 +12,11 @@ Expo / React Native app showing CoinGecko market data, plus a minimal Next.js we
 - Expo SDK 57, React Native 0.86 (New Architecture), React 19, TypeScript
 - Expo Router (file-based routes), TanStack Query for server state
 - Next.js 16 (`apps/web`, client-rendered pages, Turbopack)
-- Jest + jest-expo + React Native Testing Library (mobile); Vitest + MSW (`packages/api`, proxy); Vitest + React Testing Library + MSW (web)
+- Jest + jest-expo + React Native Testing Library (mobile); Vitest + MSW (`packages/api`); Vitest in the Workers runtime (proxy, watchlist API); Vitest + React Testing Library + MSW (web)
 - zod for response validation (`packages/api`)
 - pnpm workspaces (`pnpm-workspace.yaml`, one `pnpm-lock.yaml` at the root)
 - CoinGecko API via `apps/proxy` (Cloudflare Worker); key in `apps/proxy/.dev.vars`, never in the app
+- Watchlist API in `apps/api` (Cloudflare Worker + D1; contract in `docs/watchlist-api.md`)
 
 ## Expo has changed: do not trust your training data
 
@@ -29,6 +30,7 @@ From the repo root (`lint`, `typecheck`, `test` run in every workspace package):
 pnpm install                # install all workspaces
 pnpm start                  # Expo dev server (apps/mobile)
 pnpm proxy                  # API proxy on :8787 (wrangler dev; key in apps/proxy/.dev.vars)
+pnpm api                    # Watchlist API on :8788 (applies local D1 migrations first)
 pnpm web:next               # Next.js web app (apps/web); `pnpm web` is Expo web
 pnpm lint                   # lint
 pnpm typecheck              # tsc --noEmit
@@ -70,7 +72,7 @@ packages/
                  zod schemas, ApiError, TanStack Query hooks (one per data need).
                  Platform-free: no react-native imports. Vitest + MSW; shared handlers
                  and fixtures in src/testing (exported as @crypto-markets/api/testing).
-docs/            Public design docs (DECISIONS.md, api-audit.md). Reviewer-facing.
+docs/            Public design docs (DECISIONS.md, api-audit.md, watchlist-api.md). Reviewer-facing.
 ```
 
 ## Conventions
